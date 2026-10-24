@@ -116,3 +116,27 @@ func TestNornirMissingInventoryErrors(t *testing.T) {
 		t.Fatalf("err = %v, want *SourceError", err)
 	}
 }
+
+func TestNornirResolvesYAMLAliasesAndMergeKeys(t *testing.T) {
+	targets := fetchNornir(t, `
+defaults: &defaults
+  hostname: 10.0.0.9
+  platform: nokia_srl
+hosts:
+  r1:
+    <<: *defaults
+    hostname: 10.0.0.1
+  r2: *defaults
+`)
+	got := byName(targets)
+	r1 := got["r1"]
+	if r1.Address == nil || *r1.Address != "10.0.0.1" ||
+		r1.PlatformHint == nil || *r1.PlatformHint != "nokia_srl" {
+		t.Fatalf("r1 = %+v", r1)
+	}
+	r2 := got["r2"]
+	if r2.Address == nil || *r2.Address != "10.0.0.9" ||
+		r2.PlatformHint == nil || *r2.PlatformHint != "nokia_srl" {
+		t.Fatalf("r2 = %+v", r2)
+	}
+}

@@ -45,14 +45,52 @@ func (s *NornirSource) Fetch() ([]Target, error) {
 	}
 	var targets []Target
 	for i := 0; i+1 < len(hosts.Content); i += 2 {
-		attrs := hosts.Content[i+1]
-		addr := mapString(attrs, "hostname")
-		if addr == nil {
-			addr = mapString(attrs, "address")
+		// Decode into a map so YAML aliases and merge keys (<<) resolve like
+		// PyYAML's safe_load; the node itself keeps the host order.
+		var attrs map[string]any
+		if err := hosts.Content[i+1].Decode(&attrs); err != nil {
+			return nil, &SourceError{Msg: fmt.Sprintf("invalid nornir inventory %s: %v", path, err)}
 		}
-		targets = append(targets, Target{Name: hosts.Content[i].Value, Address: addr, PlatformHint: mapString(attrs, "platform")})
+		address := attrString(attrs, "hostname", true)
+		if address == nil {
+			address = attrString(attrs, "address", true)
+		}
+		targets = append(targets, Target{
+			Name:         hosts.Content[i].Value,
+			Address:      address,
+			PlatformHint: attrString(attrs, "platform", false),
+		})
 	}
 	return targets, nil
+}
+
+// attrString returns a host attribute as text, or nil when absent. With
+// pythonTruthy it also drops falsy values, matching Python's `x or y`.
+func attrString(attrs map[string]any, key string, pythonTruthy bool) *string {
+	value, ok := attrs[key]
+	if !ok || value == nil || (pythonTruthy && !truthy(value)) {
+		return nil
+	}
+	text := fmt.Sprint(value)
+	return &text
+}
+
+func truthy(value any) bool {
+	switch t := value.(type) {
+	case nil:
+		return false
+	case bool:
+		return t
+	case string:
+		return t != ""
+	case int:
+		return t != 0
+	case int64:
+		return t != 0
+	case float64:
+		return t != 0
+	}
+	return true
 }
 
 func mapValue(n *yaml.Node, key string) *yaml.Node {
@@ -65,13 +103,4 @@ func mapValue(n *yaml.Node, key string) *yaml.Node {
 		}
 	}
 	return nil
-}
-
-// mapString returns a non-empty scalar value, or nil (Python's `or` semantics).
-func mapString(n *yaml.Node, key string) *string {
-	v := mapValue(n, key)
-	if v == nil || v.Kind != yaml.ScalarNode || v.Tag == "!!null" || v.Value == "" {
-		return nil
-	}
-	return &v.Value
 }
