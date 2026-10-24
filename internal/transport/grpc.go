@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net"
 	"os"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -115,7 +116,8 @@ func (t *LiveTransport) credentials() (credentials.TransportCredentials, error) 
 
 func (t *LiveTransport) context() context.Context {
 	ctx := context.Background()
-	if t.Username != "" && t.Password != "" {
+	if t.Username != "" || t.Password != "" {
+		// pygnmi always sends both keys; send both whenever either is configured.
 		ctx = metadata.AppendToOutgoingContext(ctx, "username", t.Username, "password", t.Password)
 	}
 	return ctx
@@ -149,7 +151,7 @@ func (t *LiveTransport) Capabilities() (map[string]any, error) {
 	if encodings := resp.GetSupportedEncodings(); len(encodings) > 0 {
 		names := make([]any, 0, len(encodings))
 		for _, e := range encodings {
-			names = append(names, strings.ToLower(e.String()))
+			names = append(names, encodingName(e))
 		}
 		caps["supported_encodings"] = names
 	}
@@ -162,6 +164,10 @@ func (t *LiveTransport) Capabilities() (map[string]any, error) {
 // SubscribeOnce subscribes in ONCE mode and flattens the notifications to leaf
 // updates until the target's sync_response.
 func (t *LiveTransport) SubscribeOnce(paths []string, encoding string) ([]LeafUpdate, error) {
+	enc, err := encodingValue(encoding)
+	if err != nil {
+		return nil, err
+	}
 	client, err := t.connect()
 	if err != nil {
 		return nil, t.grpcError(err)
@@ -175,7 +181,7 @@ func (t *LiveTransport) SubscribeOnce(paths []string, encoding string) ([]LeafUp
 			Subscribe: &gnmi.SubscriptionList{
 				Subscription: subs,
 				Mode:         gnmi.SubscriptionList_ONCE,
-				Encoding:     encodingValue(encoding),
+				Encoding:     enc,
 			},
 		},
 	}
@@ -217,38 +223,71 @@ func (t *LiveTransport) SubscribeOnce(paths []string, encoding string) ([]LeafUp
 	return updates, nil
 }
 
-// encodingValue maps a gNMI encoding name to its enum without imposing a
-// default: an empty name is the proto zero value (JSON).
-func encodingValue(name string) gnmi.Encoding {
-	switch strings.ToLower(name) {
-	case "json":
-		return gnmi.Encoding_JSON
-	case "bytes":
-		return gnmi.Encoding_BYTES
-	case "proto":
-		return gnmi.Encoding_PROTO
-	case "ascii":
-		return gnmi.Encoding_ASCII
-	case "json_ietf":
-		return gnmi.Encoding_JSON_IETF
+// encodingName reverses a gNMI encoding enum the way pygnmi does: every value
+// above ASCII (3) is reported as json_ietf.
+func encodingName(e gnmi.Encoding) string {
+	switch e {
+	case gnmi.Encoding_JSON:
+		return "json"
+	case gnmi.Encoding_BYTES:
+		return "bytes"
+	case gnmi.Encoding_PROTO:
+		return "proto"
+	case gnmi.Encoding_ASCII:
+		return "ascii"
 	default:
-		return gnmi.Encoding_JSON
+		return "json_ietf"
 	}
 }
 
-// parsePath converts an XPath-like string to a gNMI Path the way pygnmi does:
-// a leading "origin:" on the first element sets the origin; a bare colon in
-// later elements stays part of the element name; "[key=value]" selectors
-// become PathElem keys.
+// encodingValue maps a gNMI encoding name to its enum. An empty name is
+// json_ietf, pygnmi's default; an unknown name is an error, never silent JSON.
+func encodingValue(name string) (gnmi.Encoding, error) {
+	switch strings.ToLower(name) {
+	case "", "json_ietf":
+		return gnmi.Encoding_JSON_IETF, nil
+	case "json":
+		return gnmi.Encoding_JSON, nil
+	case "bytes":
+		return gnmi.Encoding_BYTES, nil
+	case "proto":
+		return gnmi.Encoding_PROTO, nil
+	case "ascii":
+		return gnmi.Encoding_ASCII, nil
+	default:
+		return 0, fmt.Errorf("'%s' is not a valid Encoding", strings.ToUpper(name))
+	}
+}
+
+// pathKeySelector matches a gNMI key selector; extracting these before
+// splitting on "/" keeps values containing "/" intact.
+var pathKeySelector = regexp.MustCompile(`\[[^\[\]]*=[^\[\]]*\]`)
+
+type pathKey struct {
+	key   string
+	value string
+}
+
+// parsePath converts an XPath-like string to a gNMI Path the way pygnmi's
+// gnmi_path_generator does: key selectors are lifted out first, the origin comes
+// only from the first element, and a bare colon in later elements stays part of
+// the element name.
 func parsePath(in string) *gnmi.Path {
-	elements := strings.Split(in, "/")
+	var keys []pathKey
+	protected := pathKeySelector.ReplaceAllStringFunc(in, func(selector string) string {
+		key, value, _ := strings.Cut(selector[1:len(selector)-1], "=")
+		keys = append(keys, pathKey{key: key, value: value})
+		return fmt.Sprintf("[%d]", len(keys)-1)
+	})
 	path := &gnmi.Path{}
-	for i, element := range elements {
+	first := true
+	for _, element := range strings.Split(protected, "/") {
 		if element == "" {
 			continue
 		}
-		if i == 0 || len(path.Elem) == 0 {
-			if origin, rest, ok := strings.Cut(element, ":"); ok {
+		if first {
+			first = false
+			if origin, rest, ok := strings.Cut(element, ":"); ok && origin != "" {
 				path.Origin = origin
 				if rest == "" {
 					continue
@@ -256,23 +295,31 @@ func parsePath(in string) *gnmi.Path {
 				element = rest
 			}
 		}
-		path.Elem = append(path.Elem, parseElem(element))
+		path.Elem = append(path.Elem, parseElem(element, keys))
 	}
 	return path
 }
 
-func parseElem(element string) *gnmi.PathElem {
-	parts := strings.Split(element, "[")
-	elem := &gnmi.PathElem{Name: parts[0]}
-	for _, part := range parts[1:] {
-		key, value, ok := strings.Cut(strings.TrimSuffix(part, "]"), "=")
+func parseElem(element string, keys []pathKey) *gnmi.PathElem {
+	name, rest, ok := strings.Cut(element, "[")
+	if !ok {
+		return &gnmi.PathElem{Name: element}
+	}
+	elem := &gnmi.PathElem{Name: name}
+	for rest != "" {
+		part, after, ok := strings.Cut(rest, "]")
 		if !ok {
-			continue
+			return &gnmi.PathElem{Name: element} // not a selector: pygnmi keeps the element whole
+		}
+		index, err := strconv.Atoi(part)
+		if err != nil || index < 0 || index >= len(keys) {
+			return &gnmi.PathElem{Name: element}
 		}
 		if elem.Key == nil {
 			elem.Key = map[string]string{}
 		}
-		elem.Key[key] = value
+		elem.Key[keys[index].key] = keys[index].value
+		rest = strings.TrimPrefix(after, "[")
 	}
 	return elem
 }
