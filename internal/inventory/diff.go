@@ -105,6 +105,13 @@ func changed(target sources.Target, row map[string]any) bool {
 	return false
 }
 
+func deref(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
+}
+
 func rowText(value any) string {
 	text, _ := value.(string)
 	return text

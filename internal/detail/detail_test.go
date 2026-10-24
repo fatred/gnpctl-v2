@@ -1,8 +1,11 @@
 package detail
 
 import (
+	"bytes"
+	"log/slog"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/fatred/gnpctl-v2/internal/capabilities"
@@ -307,5 +310,43 @@ func TestSeedJuniperModelSelectsVariant(t *testing.T) {
 	}
 	if sel := cat.ResolveVariant("juniper", nil, qfx10k.AsDict()); sel.Variant == nil || sel.Variant.Key != "juniper-mx" {
 		t.Errorf("qfx10k variant = %+v", sel.Variant)
+	}
+}
+
+func TestMissingExtractWarningsAreSorted(t *testing.T) {
+	var logs bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
+	defer slog.SetDefault(previous)
+
+	vendor := &catalog.VendorDef{
+		Vendor: "v",
+		PlatformProbe: &catalog.PlatformProbe{
+			Path: "/p",
+			Extract: map[string]catalog.Locator{
+				"zeta":  {Leaf: "nope"},
+				"alpha": {Leaf: "missing"},
+			},
+		},
+	}
+	subs := map[string]map[string]any{"/p": {}}
+	if _, err := Resolve(transport.NewFixtureTransport(nil, subs), vendor); err != nil {
+		t.Fatal(err)
+	}
+	text := logs.String()
+	alpha := strings.Index(text, "could not extract 'alpha'")
+	zeta := strings.Index(text, "could not extract 'zeta'")
+	if alpha < 0 || zeta < 0 || alpha > zeta {
+		t.Fatalf("warnings = %q", text)
+	}
+}
+
+func TestDuplicateBlobLeafKeepsLastSortedKey(t *testing.T) {
+	updates := []transport.LeafUpdate{{Path: "/p", Value: map[string]any{
+		"b:version": "b",
+		"a:version": "a",
+	}}}
+	if got := group(updates)[0].leaves["version"]; got != "b" {
+		t.Fatalf("version = %v, want the last sorted key's value %q", got, "b")
 	}
 }

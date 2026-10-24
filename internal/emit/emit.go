@@ -1,16 +1,16 @@
-// Package emit serializes a DesiredConfig to the gnmic YAML files. The dump
-// mirrors PyYAML's safe_dump output (block style, indentless sequences, 80-column
-// folding, sort_keys=False) so rendered files are byte-identical to Python's.
+// Package emit serializes a DesiredConfig to the gnmic YAML files. It builds a
+// yaml.Node tree in Python's key order and encodes it with yaml.v3, so the files
+// are semantically identical to PyYAML's safe_dump(sort_keys=False) output.
 package emit
 
 import (
+	"bytes"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/fatred/gnpctl-v2/internal/render"
 	"gopkg.in/yaml.v3"
@@ -203,503 +203,140 @@ func egressDoc(desired *render.DesiredConfig) render.Ordered {
 	return doc
 }
 
-// ----- PyYAML-compatible dumper -----
-
+// dump encodes one artifact as a YAML document with a two-space indent.
 func dump(doc render.Ordered) (string, error) {
-	w := &yamlWriter{whitespace: true, indention: true, bestWidth: 80}
-	if err := w.emitMapping(doc, 0); err != nil {
+	root, err := mappingNode(doc)
+	if err != nil {
 		return "", err
 	}
-	w.writeLineBreak()
-	return w.buf.String(), nil
-}
-
-type yamlWriter struct {
-	buf        strings.Builder
-	column     int
-	whitespace bool
-	indention  bool
-	bestWidth  int
-}
-
-func (w *yamlWriter) emitMapping(mapping render.Ordered, indent int) error {
-	for i, key := range mapping.Keys {
-		w.writeIndent(indent)
-		w.writeScalar(key, indent, false)
-		w.writeIndicator(":", false, false, false)
-		if err := w.emitValue(mapping.Values[i], indent); err != nil {
-			return err
-		}
+	var buf bytes.Buffer
+	enc := yaml.NewEncoder(&buf)
+	enc.SetIndent(2)
+	if err := enc.Encode(root); err != nil {
+		return "", err
 	}
-	return nil
+	if err := enc.Close(); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
 }
 
-// emitValue writes a node in block mapping-value position (inline for scalars
-// and empty collections, next line for non-empty collections).
-func (w *yamlWriter) emitValue(value any, indent int) error {
+// mappingNode builds a mapping node, preserving the Ordered key order.
+func mappingNode(doc render.Ordered) (*yaml.Node, error) {
+	node := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+	for i, key := range doc.Keys {
+		value, err := valueNode(doc.Values[i])
+		if err != nil {
+			return nil, err
+		}
+		node.Content = append(node.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key}, value)
+	}
+	return node, nil
+}
+
+func valueNode(value any) (*yaml.Node, error) {
 	switch v := value.(type) {
 	case *yaml.Node:
-		return w.emitValue(nodeValue(v), indent)
+		return copyNode(v), nil
 	case render.Ordered:
-		return w.emitMappingValue(v, indent)
+		return mappingNode(v)
 	case *render.Ordered:
 		if v == nil {
-			w.writePlain("null", indent+2, true)
-			return nil
+			return nullNode(), nil
 		}
-		return w.emitMappingValue(*v, indent)
+		return mappingNode(*v)
 	case []any:
-		return w.emitSequenceValue(v, indent)
+		return sequenceNode(v)
 	case []string:
-		return w.emitSequenceValue(stringsToAny(v), indent)
-	default:
-		return w.emitScalar(value, indent+2, true)
-	}
-}
-
-func (w *yamlWriter) emitMappingValue(mapping render.Ordered, indent int) error {
-	if len(mapping.Keys) == 0 {
-		w.writeIndicator("{}", true, false, false)
-		return nil
-	}
-	w.writeLineBreak()
-	return w.emitMapping(mapping, indent+2)
-}
-
-func (w *yamlWriter) emitSequenceValue(seq []any, indent int) error {
-	if len(seq) == 0 {
-		w.writeIndicator("[]", true, false, false)
-		return nil
-	}
-	w.writeLineBreak()
-	return w.emitSequence(seq, indent)
-}
-
-// emitSequence writes block sequence items. A sequence in mapping-value position
-// is indentless, so items sit at the mapping key's own indentation.
-func (w *yamlWriter) emitSequence(seq []any, indent int) error {
-	for _, item := range seq {
-		w.writeIndent(indent)
-		w.writeIndicator("-", true, false, true)
-		switch v := item.(type) {
-		case *yaml.Node:
-			if err := w.emitSequenceItem(nodeValue(v), indent); err != nil {
-				return err
-			}
-		default:
-			if err := w.emitSequenceItem(item, indent); err != nil {
-				return err
-			}
+		items := make([]any, len(v))
+		for i, item := range v {
+			items[i] = item
 		}
-	}
-	return nil
-}
-
-func (w *yamlWriter) emitSequenceItem(value any, indent int) error {
-	switch v := value.(type) {
-	case render.Ordered:
-		if len(v.Keys) == 0 {
-			w.writeIndicator("{}", true, false, false)
-			return nil
-		}
-		return w.emitMapping(v, indent+2)
-	case *render.Ordered:
-		if v == nil {
-			w.writePlain("null", indent+2, true)
-			return nil
-		}
-		return w.emitSequenceItem(*v, indent)
-	case []any:
-		if len(v) == 0 {
-			w.writeIndicator("[]", true, false, false)
-			return nil
-		}
-		return w.emitSequence(v, indent+2)
-	case []string:
-		return w.emitSequenceItem(stringsToAny(v), indent)
-	default:
-		return w.emitScalar(value, indent+2, true)
-	}
-}
-
-func (w *yamlWriter) emitScalar(value any, indent int, split bool) error {
-	switch v := value.(type) {
+		return sequenceNode(items)
 	case nil:
-		w.writePlain("null", indent, split)
+		return nullNode(), nil
 	case bool:
-		w.writePlain(strconv.FormatBool(v), indent, split)
+		return scalarNode("!!bool", strconv.FormatBool(v)), nil
 	case int:
-		w.writePlain(strconv.Itoa(v), indent, split)
+		return scalarNode("!!int", strconv.Itoa(v)), nil
 	case int64:
-		w.writePlain(strconv.FormatInt(v, 10), indent, split)
+		return scalarNode("!!int", strconv.FormatInt(v, 10)), nil
 	case float64:
-		text := strconv.FormatFloat(v, 'g', -1, 64)
-		w.writePlain(text, indent, split)
+		return scalarNode("!!float", floatText(v)), nil
 	case string:
-		w.writeScalar(v, indent, split)
+		return scalarNode("!!str", v), nil
 	default:
-		return fmt.Errorf("yaml: cannot dump %T", value)
-	}
-	return nil
-}
-
-// writeScalar writes a string choosing PyYAML's scalar style: plain when
-// unambiguous, else single-quoted, else double-quoted.
-func (w *yamlWriter) writeScalar(text string, indent int, split bool) {
-	if text == "" {
-		w.writeSingleQuoted(text, indent, split)
-		return
-	}
-	allowPlain, allowSingle := analyzeScalar(text)
-	if allowPlain && !resolvesNonStr(text) {
-		w.writePlain(text, indent, split)
-		return
-	}
-	if allowSingle {
-		w.writeSingleQuoted(text, indent, split)
-		return
-	}
-	w.writeDoubleQuoted(text, indent)
-}
-
-func (w *yamlWriter) writeIndicator(indicator string, needWhitespace, whitespace, indention bool) {
-	data := indicator
-	if !w.whitespace && needWhitespace {
-		data = " " + indicator
-	}
-	w.whitespace = whitespace
-	w.indention = w.indention && indention
-	w.column += utf8.RuneCountInString(data)
-	w.buf.WriteString(data)
-}
-
-func (w *yamlWriter) writeLineBreak() {
-	w.whitespace = true
-	w.indention = true
-	w.column = 0
-	w.buf.WriteByte('\n')
-}
-
-func (w *yamlWriter) writeIndent(indent int) {
-	if !w.indention || w.column > indent || (w.column == indent && !w.whitespace) {
-		w.writeLineBreak()
-	}
-	if w.column < indent {
-		w.whitespace = true
-		w.buf.WriteString(strings.Repeat(" ", indent-w.column))
-		w.column = indent
+		return nil, fmt.Errorf("yaml: cannot dump %T", value)
 	}
 }
 
-func (w *yamlWriter) writePlain(text string, indent int, split bool) {
-	if text == "" {
-		return
-	}
-	if !w.whitespace {
-		w.buf.WriteByte(' ')
-		w.column++
-	}
-	w.whitespace = false
-	w.indention = false
-	runes := []rune(text)
-	spaces := false
-	start, end := 0, 0
-	for end <= len(runes) {
-		var ch rune
-		has := end < len(runes)
-		if has {
-			ch = runes[end]
+func sequenceNode(items []any) (*yaml.Node, error) {
+	node := &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
+	for _, item := range items {
+		child, err := valueNode(item)
+		if err != nil {
+			return nil, err
 		}
-		switch {
-		case spaces:
-			if !has || ch != ' ' {
-				if start+1 == end && w.column > w.bestWidth && split {
-					w.writeIndent(indent)
-					w.whitespace = false
-					w.indention = false
-				} else {
-					w.buf.WriteString(string(runes[start:end]))
-					w.column += end - start
-				}
-				start = end
-			}
-		case has && ch == '\n':
-			// Plain scalars never contain line breaks (analyze forbids them).
-			w.buf.WriteString(string(runes[start:end]))
-			w.column += end - start
-			w.writeLineBreak()
-			start = end
-		default:
-			if !has || ch == ' ' {
-				w.buf.WriteString(string(runes[start:end]))
-				w.column += end - start
-				start = end
-			}
-		}
-		if has {
-			spaces = ch == ' '
-		}
-		end++
+		node.Content = append(node.Content, child)
 	}
+	return node, nil
 }
 
-func (w *yamlWriter) writeSingleQuoted(text string, indent int, split bool) {
-	w.writeIndicator("'", true, false, false)
-	runes := []rune(text)
-	spaces := false
-	start, end := 0, 0
-	for end <= len(runes) {
-		var ch rune
-		has := end < len(runes)
-		if has {
-			ch = runes[end]
-		}
-		if spaces {
-			if !has || ch != ' ' {
-				if start+1 == end && w.column > w.bestWidth && split &&
-					start != 0 && end != len(runes) {
-					w.writeIndent(indent)
-				} else {
-					w.buf.WriteString(string(runes[start:end]))
-					w.column += end - start
-				}
-				start = end
-			}
-		} else if !has || ch == ' ' || ch == '\n' || ch == '\'' {
-			if start < end {
-				w.buf.WriteString(string(runes[start:end]))
-				w.column += end - start
-				start = end
-			}
-		}
-		if has && ch == '\'' {
-			w.buf.WriteString("''")
-			w.column += 2
-			start = end + 1
-		}
-		if has {
-			spaces = ch == ' '
-		}
-		end++
-	}
-	w.writeIndicator("'", false, false, false)
+func scalarNode(tag, value string) *yaml.Node {
+	return &yaml.Node{Kind: yaml.ScalarNode, Tag: tag, Value: value}
 }
 
-func (w *yamlWriter) writeDoubleQuoted(text string, indent int) {
-	_ = indent
-	w.writeIndicator("\"", true, false, false)
-	for _, r := range text {
-		switch r {
-		case '\\':
-			w.buf.WriteString(`\\`)
-		case '"':
-			w.buf.WriteString(`\"`)
-		case '\n':
-			w.buf.WriteString(`\n`)
-		case '\t':
-			w.buf.WriteString(`\t`)
-		case '\r':
-			w.buf.WriteString(`\r`)
-		default:
-			if r < 0x20 || r == 0x7f {
-				fmt.Fprintf(&w.buf, "\\x%02x", r)
-				continue
-			}
-			w.buf.WriteRune(r)
-		}
+func nullNode() *yaml.Node { return scalarNode("!!null", "null") }
+
+// floatText formats a float so YAML readers resolve it as a float: PyYAML-style
+// .inf/.nan and a trailing .0 when the shortest form would look like an int.
+func floatText(f float64) string {
+	switch {
+	case math.IsInf(f, 1):
+		return ".inf"
+	case math.IsInf(f, -1):
+		return "-.inf"
+	case math.IsNaN(f):
+		return ".nan"
 	}
-	w.writeIndicator("\"", false, false, false)
+	text := strconv.FormatFloat(f, 'g', -1, 64)
+	if !strings.ContainsAny(text, ".eE") {
+		text += ".0"
+	}
+	return text
 }
 
-// analyzeScalar reports whether PyYAML may emit the string as a block plain or
-// single-quoted scalar (ported from yaml/emitter.py's analyze_scalar).
-func analyzeScalar(text string) (allowBlockPlain bool, allowSingle bool) {
-	runes := []rune(text)
-	if len(runes) == 0 {
-		return false, true
-	}
-	blockIndicators := false
-	lineBreaks := false
-	special := false
-	leadingSpace, leadingBreak, trailingSpace, trailingBreak := false, false, false, false
-	breakSpace, spaceBreak := false, false
-	precededByWhitespace := true
-	followedByWhitespace := len(runes) == 1 || isYAMLWhitespace(runes[1])
-	previousSpace, previousBreak := false, false
-
-	for index := 0; index < len(runes); index++ {
-		ch := runes[index]
-		if index == 0 {
-			if strings.ContainsRune("#,[]{}&*!|>'\"%@`", ch) {
-				blockIndicators = true
-			}
-			if ch == '?' || ch == ':' {
-				if followedByWhitespace {
-					blockIndicators = true
-				}
-			}
-			if ch == '-' && followedByWhitespace {
-				blockIndicators = true
-			}
-		} else {
-			if ch == ':' && followedByWhitespace {
-				blockIndicators = true
-			}
-			if ch == '#' && precededByWhitespace {
-				blockIndicators = true
-			}
-		}
-
-		if ch == '\n' {
-			lineBreaks = true
-		}
-		if !(ch == '\n' || (ch >= 0x20 && ch <= 0x7e)) && !isPrintableUnicode(ch) {
-			special = true
-		}
-
-		switch {
-		case ch == ' ':
-			if index == 0 {
-				leadingSpace = true
-			}
-			if index == len(runes)-1 {
-				trailingSpace = true
-			}
-			if previousBreak {
-				breakSpace = true
-			}
-			previousSpace, previousBreak = true, false
-		case ch == '\n':
-			if index == 0 {
-				leadingBreak = true
-			}
-			if index == len(runes)-1 {
-				trailingBreak = true
-			}
-			if previousSpace {
-				spaceBreak = true
-			}
-			previousSpace, previousBreak = false, true
-		default:
-			previousSpace, previousBreak = false, false
-		}
-
-		precededByWhitespace = isYAMLWhitespace(ch)
-		// PyYAML's off-by-one: after incrementing, it inspects scalar[index+2].
-		followedByWhitespace = index+2 >= len(runes) || isYAMLWhitespace(runes[index+2])
-	}
-
-	allowBlockPlain = true
-	allowSingle = true
-	if leadingSpace || leadingBreak || trailingSpace || trailingBreak {
-		allowBlockPlain = false
-	}
-	if breakSpace {
-		allowBlockPlain = false
-		allowSingle = false
-	}
-	if spaceBreak || special {
-		allowBlockPlain = false
-		allowSingle = false
-	}
-	if lineBreaks {
-		allowBlockPlain = false
-	}
-	if blockIndicators {
-		allowBlockPlain = false
-	}
-	return allowBlockPlain, allowSingle
-}
-
-func isYAMLWhitespace(ch rune) bool {
-	switch ch {
-	case 0x00, ' ', '\t', '\r', '\n', 0x85, 0x2028, 0x2029:
-		return true
-	}
-	return false
-}
-
-func isPrintableUnicode(ch rune) bool {
-	if ch == 0x85 {
-		return true
-	}
-	if ch == 0xFEFF {
-		return false
-	}
-	return (ch >= 0xA0 && ch <= 0xD7FF) || (ch >= 0xE000 && ch <= 0xFFFD) ||
-		(ch >= 0x10000 && ch < 0x10FFFF)
-}
-
-var (
-	boolScalar  = regexp.MustCompile(`^(y|Y|yes|Yes|YES|n|N|no|No|NO|true|True|TRUE|false|False|FALSE|on|On|ON|off|Off|OFF)$`)
-	intScalar   = regexp.MustCompile(`^[-+]?(0b[0-1_]+|0x[0-9a-fA-F_]+|0[0-7_]+|[0-9][0-9_]*)$`)
-	floatScalar = regexp.MustCompile(
-		`^[-+]?((([0-9][0-9_]*)?\.[0-9_]+|[0-9][0-9_]*)([eE][-+]?[0-9]+)?|\.(inf|Inf|INF|nan|NaN|NAN))$`)
-	dateScalar = regexp.MustCompile(`^[0-9]{4}-[0-9]{2}-[0-9]{2}([Tt ].*)?$`)
-)
-
-// resolvesNonStr reports whether a plain string would be resolved by PyYAML's
-// implicit resolvers to a non-string tag, forcing the quotes.
-func resolvesNonStr(text string) bool {
-	switch text {
-	case "", "~", "null", "Null", "NULL":
-		return true
-	}
-	return boolScalar.MatchString(text) || intScalar.MatchString(text) ||
-		floatScalar.MatchString(text) || dateScalar.MatchString(text)
-}
-
-func stringsToAny(items []string) []any {
-	out := make([]any, len(items))
-	for i, item := range items {
-		out[i] = item
-	}
-	return out
-}
-
-// nodeValue converts a catalog YAML node into the dumper's value tree.
-func nodeValue(node *yaml.Node) any {
+// copyNode deep-copies a catalog YAML node as a plain block node, resolving
+// aliases so the emitted document never references an anchor outside itself.
+func copyNode(node *yaml.Node) *yaml.Node {
 	switch node.Kind {
 	case yaml.DocumentNode:
 		if len(node.Content) > 0 {
-			return nodeValue(node.Content[0])
+			return copyNode(node.Content[0])
 		}
-		return nil
+		return nullNode()
 	case yaml.AliasNode:
-		return nodeValue(node.Alias)
+		return copyNode(node.Alias)
 	case yaml.MappingNode:
-		mapping := render.Ordered{}
+		copied := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
 		for i := 0; i+1 < len(node.Content); i += 2 {
-			mapping.Set(node.Content[i].Value, nodeValue(node.Content[i+1]))
+			copied.Content = append(copied.Content,
+				copyNode(node.Content[i]), copyNode(node.Content[i+1]))
 		}
-		return mapping
+		return copied
 	case yaml.SequenceNode:
-		seq := make([]any, 0, len(node.Content))
+		copied := &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
 		for _, item := range node.Content {
-			seq = append(seq, nodeValue(item))
+			copied.Content = append(copied.Content, copyNode(item))
 		}
-		return seq
-	case yaml.ScalarNode:
-		switch node.Tag {
-		case "!!bool":
-			var b bool
-			if err := node.Decode(&b); err == nil {
-				return b
-			}
-		case "!!int":
-			var i int64
-			if err := node.Decode(&i); err == nil {
-				return int(i)
-			}
-		case "!!float":
-			var f float64
-			if err := node.Decode(&f); err == nil {
-				return f
-			}
-		case "!!null":
-			return nil
+		return copied
+	default:
+		tag := node.Tag
+		if tag == "" {
+			tag = "!!str"
 		}
-		return node.Value
+		return scalarNode(tag, node.Value)
 	}
-	return nil
 }
+

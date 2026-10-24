@@ -74,7 +74,7 @@ func openTestState(t *testing.T) *state.State {
 func discovered(t *testing.T, s *state.State, cat *catalog.LayeredCatalog, name string, modules ...string) {
 	t.Helper()
 	port := 57400
-	if err := s.UpsertTarget(name, "10.0.0.1", &port, "", ""); err != nil {
+	if err := s.UpsertTarget(name, new("10.0.0.1"), &port, new(""), ""); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.EnrichTarget(name, state.Enrichment{
@@ -170,7 +170,7 @@ func TestNotReadyTargetSkipped(t *testing.T) {
 	cat := testCatalog(t)
 	s := openTestState(t)
 	port := 57400
-	if err := s.UpsertTarget("undisc", "10.0.0.2", &port, "", ""); err != nil {
+	if err := s.UpsertTarget("undisc", new("10.0.0.2"), &port, new(""), ""); err != nil {
 		t.Fatal(err)
 	}
 	tr := fixture(map[string]map[string]any{"/interfaces": {"leaf": 1}})
