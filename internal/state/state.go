@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -106,14 +107,6 @@ func nowOr(now *int64) int64 {
 	return *now
 }
 
-// nullIfEmpty stores NULL for an unset text value, matching Python's None.
-func nullIfEmpty(v string) any {
-	if v == "" {
-		return nil
-	}
-	return v
-}
-
 func intOrNil(v *int) any {
 	if v == nil {
 		return nil
@@ -162,13 +155,6 @@ func queryRow(db *sql.DB, query string, args ...any) (map[string]any, error) {
 
 // AddSource registers an inventory source; a duplicate name is a StateError.
 func (s *State) AddSource(name, typ string, parameters map[string]any, credentialRef string) error {
-	existing, err := s.GetSource(name)
-	if err != nil {
-		return err
-	}
-	if existing != nil {
-		return &StateError{Message: fmt.Sprintf("source '%s' already exists", name)}
-	}
 	params := parameters
 	if params == nil {
 		params = map[string]any{}
@@ -179,8 +165,13 @@ func (s *State) AddSource(name, typ string, parameters map[string]any, credentia
 	}
 	_, err = s.db.Exec(
 		"INSERT INTO inventory_sources(name,type,parameters,credential_ref) VALUES(?,?,?,?)",
-		name, typ, string(encoded), nullIfEmpty(credentialRef),
+		name, typ, string(encoded), credentialRef,
 	)
+	// Python catches sqlite3.IntegrityError instead of checking first: the insert
+	// is the atomic duplicate test.
+	if err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed") {
+		return &StateError{Message: fmt.Sprintf("source '%s' already exists", name)}
+	}
 	return err
 }
 
@@ -325,18 +316,29 @@ func (s *State) EnabledModules(target string, names []string) ([]string, error) 
 }
 
 // ReconcileModules sets discovery-owned columns (current 0/1) to the profile
-// default; operator pins (-1 force-off / 2 force-on) are preserved.
+// default; operator pins (-1 force-off / 2 force-on) are preserved. All updates
+// commit together, as Python's single commit does.
 func (s *State) ReconcileModules(target string, defaults map[string]int) error {
-	for name, value := range defaults {
+	names := make([]string, 0, len(defaults))
+	for name := range defaults {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for _, name := range names {
 		col := ModuleColumn(name)
-		if _, err := s.db.Exec(
+		if _, err := tx.Exec(
 			fmt.Sprintf(`UPDATE targets SET "%s"=? WHERE name=? AND "%s" IN (0, 1)`, col, col),
-			value, target,
+			defaults[name], target,
 		); err != nil {
 			return err
 		}
 	}
-	return nil
+	return tx.Commit()
 }
 
 // ----- targets -----
@@ -351,26 +353,26 @@ func (s *State) UpsertTarget(name, address string, port *int, platformHint, sour
 	if existing == nil {
 		_, err = s.db.Exec(
 			"INSERT INTO targets(name,address,port,platform_hint,source) VALUES(?,?,?,?,?)",
-			name, nullIfEmpty(address), intOrNil(port), nullIfEmpty(platformHint), nullIfEmpty(source),
+			name, address, intOrNil(port), platformHint, source,
 		)
 		return err
 	}
 	if port != nil {
 		_, err = s.db.Exec(
 			"UPDATE targets SET address=?, port=?, platform_hint=?, source=? WHERE name=?",
-			nullIfEmpty(address), *port, nullIfEmpty(platformHint), nullIfEmpty(source), name,
+			address, *port, platformHint, source, name,
 		)
 		return err
 	}
 	_, err = s.db.Exec(
 		"UPDATE targets SET address=?, platform_hint=?, source=? WHERE name=?",
-		nullIfEmpty(address), nullIfEmpty(platformHint), nullIfEmpty(source), name,
+		address, platformHint, source, name,
 	)
 	return err
 }
 
 // Enrichment carries the discovery-owned target fields written in one
-// statement; nil/empty values store SQL NULL.
+// statement; text values are stored verbatim (Python stores "" as "", not NULL).
 type Enrichment struct {
 	Discovered       bool
 	LastDiscoveryRun int64
@@ -395,9 +397,9 @@ func (s *State) EnrichTarget(name string, e Enrichment) error {
 		   vendor=?, os=?, model=?, os_version=?, capabilities_hash=?,
 		   port=COALESCE(?, port), last_error=NULL
 		 WHERE name=?`,
-		discovered, e.LastDiscoveryRun, nullIfEmpty(e.CatalogKey),
-		nullIfEmpty(e.Vendor), nullIfEmpty(e.OS), nullIfEmpty(e.Model),
-		nullIfEmpty(e.OSVersion), nullIfEmpty(e.CapabilitiesHash),
+		discovered, e.LastDiscoveryRun, e.CatalogKey,
+		e.Vendor, e.OS, e.Model,
+		e.OSVersion, e.CapabilitiesHash,
 		intOrNil(e.Port), name,
 	)
 	return err

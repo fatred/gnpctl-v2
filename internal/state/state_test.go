@@ -2,6 +2,7 @@ package state
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -431,5 +432,91 @@ func TestOpensPythonDBAndAddsModuleColumn(t *testing.T) {
 	}
 	if typ != "INTEGER" {
 		t.Fatalf("new column type = %q", typ)
+	}
+}
+
+func TestEmptyTextIsStoredAsEmpty(t *testing.T) {
+	s := newState(t)
+	if err := s.UpsertTarget("leaf1", "", nil, "", ""); err != nil {
+		t.Fatal(err)
+	}
+	tgt, err := s.GetTarget("leaf1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, col := range []string{"address", "platform_hint", "source"} {
+		if tgt[col] != "" {
+			t.Errorf("%s = %#v, want \"\"", col, tgt[col])
+		}
+	}
+
+	if err := s.EnrichTarget("leaf1", Enrichment{Discovered: true, LastDiscoveryRun: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if tgt, err = s.GetTarget("leaf1"); err != nil {
+		t.Fatal(err)
+	}
+	for _, col := range []string{"catalog_key", "vendor", "os", "model", "os_version", "capabilities_hash"} {
+		if tgt[col] != "" {
+			t.Errorf("%s = %#v, want \"\"", col, tgt[col])
+		}
+	}
+
+	if err := s.AddSource("nb", "netbox", nil, ""); err != nil {
+		t.Fatal(err)
+	}
+	src, err := s.GetSource("nb")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if src["credential_ref"] != "" {
+		t.Errorf("credential_ref = %#v, want \"\"", src["credential_ref"])
+	}
+}
+
+func TestConcurrentDuplicateAddSourceReturnsStateError(t *testing.T) {
+	s := newState(t)
+	for i := 0; i < 50; i++ {
+		name := fmt.Sprintf("src-%d", i)
+		start := make(chan struct{})
+		errs := make(chan error, 2)
+		for j := 0; j < 2; j++ {
+			go func() {
+				<-start
+				errs <- s.AddSource(name, "nornir", nil, "")
+			}()
+		}
+		close(start)
+		for j := 0; j < 2; j++ {
+			err := <-errs
+			if err == nil {
+				continue
+			}
+			var stateErr *StateError
+			if !errors.As(err, &stateErr) || stateErr.Message != fmt.Sprintf("source '%s' already exists", name) {
+				t.Fatalf("duplicate AddSource error = %v, want StateError", err)
+			}
+		}
+	}
+}
+
+func TestReconcileModulesRollsBackOnError(t *testing.T) {
+	s := newState(t, "bgp-peers")
+	if err := s.UpsertTarget("leaf1", "10.0.0.1", nil, "", ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetModule("leaf1", "bgp-peers", 1); err != nil {
+		t.Fatal(err)
+	}
+	err := s.ReconcileModules("leaf1", map[string]int{"bgp-peers": 0, "zzz-missing": 1})
+	if err == nil {
+		t.Fatal("ReconcileModules succeeded, want a missing-column error")
+	}
+	v, err := s.ModuleValue("leaf1", "bgp-peers")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v == nil || *v != 1 {
+		t.Fatalf("bgp-peers = %v, want 1 (first update must roll back)", v)
 	}
 }
