@@ -1,6 +1,9 @@
 package catalog
 
-import "fmt"
+import (
+	"fmt"
+	"sort"
+)
 
 // YangSelection is the registry release chosen for a device, with an optional advisory.
 type YangSelection struct {
@@ -22,6 +25,7 @@ func (y *YangRegistry) Vendors() []string {
 	for vendor := range y.facts {
 		out = append(out, vendor)
 	}
+	sort.Strings(out) // Python iterates the sorted vendor directories
 	return out
 }
 
@@ -30,6 +34,9 @@ func (y *YangRegistry) Releases(vendor string) []string {
 	for release := range y.facts[vendor] {
 		rels = append(rels, release)
 	}
+	// Python sorts the filename-ordered dict keys stably by version key, so ties
+	// (4.32.0F vs 4.32.0M) resolve by name, not map iteration order.
+	sort.Strings(rels)
 	sortByVersion(rels)
 	return rels
 }
