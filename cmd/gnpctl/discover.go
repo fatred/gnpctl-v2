@@ -15,7 +15,7 @@ func newDiscoverCmd(app *appContext) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "discover",
 		Short: "Fingerprint targets and register their catalog match.",
-		Args:  cobra.NoArgs,
+		Args:  usageArgs(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			mode := "default"
 			if periodic {

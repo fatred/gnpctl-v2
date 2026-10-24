@@ -27,11 +27,6 @@ const SkipVerifyBanner = "# ====================================================
 	"# Prefer `render.gnmic.tls_ca: <ca-bundle>` to pin a private CA instead.\n" +
 	"# ============================================================================\n"
 
-// Emitter writes the rendered artifacts and returns the written paths.
-type Emitter interface {
-	Emit(desired *render.DesiredConfig) ([]string, error)
-}
-
 // FileEmitter serializes a DesiredConfig to ingress.yaml / egress.yaml /
 // targets.yaml under OutputDir.
 type FileEmitter struct {

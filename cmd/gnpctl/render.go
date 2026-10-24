@@ -14,7 +14,7 @@ func newRenderCmd(app *appContext) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "render",
 		Short: "Render the gnmic ingress/egress + targets config files from discovered state.",
-		Args:  cobra.NoArgs,
+		Args:  usageArgs(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			cfg, err := app.config()
 			if err != nil {
