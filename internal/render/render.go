@@ -328,8 +328,14 @@ func collectSlices(
 		}
 		sort.Strings(targetSubs)
 		tags := Ordered{}
-		tags.Set("vendor", row["vendor"])
-		tags.Set("model", row["model"])
+		// Python's row.get() yields None for an absent column and emit drops
+		// None tags; Go stores text columns as "", so drop those here.
+		if vendor, ok := row["vendor"].(string); ok && vendor != "" {
+			tags.Set("vendor", vendor)
+		}
+		if model, ok := row["model"].(string); ok && model != "" {
+			tags.Set("model", model)
+		}
 		tags.Set("variant", key)
 		targets = append(targets, TargetEntry{
 			Name:          targetName,
