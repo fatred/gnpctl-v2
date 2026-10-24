@@ -458,7 +458,7 @@ func TestNilInventoryTextIsStoredAsNull(t *testing.T) {
 	}
 }
 
-func TestEmptyTextIsStoredAsEmpty(t *testing.T) {
+func TestEmptyInventoryTextIsStoredAsEmpty(t *testing.T) {
 	s := newState(t)
 	if err := s.UpsertTarget("leaf1", new(""), nil, new(""), ""); err != nil {
 		t.Fatal(err)
@@ -480,8 +480,8 @@ func TestEmptyTextIsStoredAsEmpty(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, col := range []string{"catalog_key", "vendor", "os", "model", "os_version", "capabilities_hash"} {
-		if tgt[col] != "" {
-			t.Errorf("%s = %#v, want \"\"", col, tgt[col])
+		if tgt[col] != nil {
+			t.Errorf("%s = %#v, want NULL", col, tgt[col])
 		}
 	}
 

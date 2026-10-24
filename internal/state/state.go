@@ -114,6 +114,13 @@ func intOrNil(v *int) any {
 	return *v
 }
 
+func nullIfEmpty(text string) any {
+	if text == "" {
+		return nil
+	}
+	return text
+}
+
 func queryRows(db *sql.DB, query string, args ...any) ([]map[string]any, error) {
 	rows, err := db.Query(query, args...)
 	if err != nil {
@@ -374,7 +381,8 @@ func (s *State) UpsertTarget(name string, address *string, port *int, platformHi
 }
 
 // Enrichment carries the discovery-owned target fields written in one
-// statement; text values are stored verbatim (Python stores "" as "", not NULL).
+// statement; an empty text value is stored as NULL, like Python's None (the
+// pipeline passes "" for an absent identity value).
 type Enrichment struct {
 	Discovered       bool
 	LastDiscoveryRun int64
@@ -399,9 +407,9 @@ func (s *State) EnrichTarget(name string, e Enrichment) error {
 		   vendor=?, os=?, model=?, os_version=?, capabilities_hash=?,
 		   port=COALESCE(?, port), last_error=NULL
 		 WHERE name=?`,
-		discovered, e.LastDiscoveryRun, e.CatalogKey,
-		e.Vendor, e.OS, e.Model,
-		e.OSVersion, e.CapabilitiesHash,
+		discovered, e.LastDiscoveryRun, nullIfEmpty(e.CatalogKey),
+		nullIfEmpty(e.Vendor), nullIfEmpty(e.OS), nullIfEmpty(e.Model),
+		nullIfEmpty(e.OSVersion), nullIfEmpty(e.CapabilitiesHash),
 		intOrNil(e.Port), name,
 	)
 	return err
