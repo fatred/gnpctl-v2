@@ -66,7 +66,12 @@ func dirNames(dir string) ([]string, error) {
 	}
 	var out []string
 	for _, entry := range entries {
-		if entry.IsDir() {
+		// os.Stat (not DirEntry.IsDir) follows symlinks, like Python's is_dir().
+		info, err := os.Stat(filepath.Join(dir, entry.Name()))
+		if err != nil {
+			return nil, err
+		}
+		if info.IsDir() {
 			out = append(out, entry.Name())
 		}
 	}
@@ -85,11 +90,7 @@ func loadRegistry(path string) (*ModuleRegistry, error) {
 	}
 	registry := &ModuleRegistry{}
 	for i := 0; i+1 < len(modules.Content); i += 2 {
-		var value any
-		if err := modules.Content[i+1].Decode(&value); err != nil {
-			return nil, loadErr(path, err)
-		}
-		registry.entries.Set(modules.Content[i].Value, pyBool(value))
+		registry.entries.Set(modules.Content[i].Value, yamlBool(modules.Content[i+1]))
 	}
 	return registry, nil
 }
@@ -230,6 +231,7 @@ func Load(dir string) (*LayeredCatalog, error) {
 	if err != nil {
 		return nil, err
 	}
+	variantFiles := map[string]string{}
 	for _, name := range vendors {
 		if name == "processors" || name == "yang" {
 			continue // the processor library / yang-facts registry, not a vendor
@@ -260,7 +262,6 @@ func Load(dir string) (*LayeredCatalog, error) {
 		if err != nil {
 			return nil, err
 		}
-		variantFiles := map[string]string{}
 		for _, variantDirName := range variantDirs {
 			variantDir := filepath.Join(vendorDir, variantDirName)
 			commonPath := filepath.Join(variantDir, "common.yaml")

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -185,5 +186,30 @@ func TestNetBoxMissingTokenEnvErrors(t *testing.T) {
 	}
 	if called {
 		t.Fatal("request made without a token")
+	}
+}
+
+func TestNetBoxDoesNotFollowRedirects(t *testing.T) {
+	t.Setenv("NETBOX_TOKEN", "s3cret")
+	var leaked atomic.Bool
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		leaked.Store(true)
+		_, _ = w.Write([]byte(recordedNetBox))
+	}))
+	defer target.Close()
+	redirect := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, target.URL+"/graphql/", http.StatusTemporaryRedirect)
+	}))
+	defer redirect.Close()
+
+	_, err := (&NetBoxSource{
+		Params:        map[string]string{"url": redirect.URL, "tag": "gnmi-managed"},
+		CredentialRef: "NETBOX_TOKEN",
+	}).Fetch()
+	if err == nil || !strings.Contains(err.Error(), "Redirect response") {
+		t.Fatalf("err = %v, want a Redirect response error", err)
+	}
+	if leaked.Load() {
+		t.Fatal("followed the redirect and re-sent the API token")
 	}
 }

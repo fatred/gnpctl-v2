@@ -470,3 +470,62 @@ func TestNullEntriesRejected(t *testing.T) {
 		})
 	}
 }
+
+func TestSymlinkedVendorAndVariantDirectoriesLoad(t *testing.T) {
+	base := t.TempDir()
+	variantDir := filepath.Join(base, "variant")
+	if err := os.MkdirAll(variantDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(variantDir, "common.yaml"), []byte(srlinuxCommon), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	vendorDir := filepath.Join(base, "vendor")
+	if err := os.MkdirAll(vendorDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(vendorDir, "vendor.yaml"), []byte(nokiaVendor), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(variantDir, filepath.Join(vendorDir, "srlinux")); err != nil {
+		t.Fatal(err)
+	}
+
+	root := writeTree(t, map[string]string{"modules.yaml": treeModules})
+	if err := os.Symlink(vendorDir, filepath.Join(root, "nokia")); err != nil {
+		t.Fatal(err)
+	}
+	cat := mustLoad(t, root)
+	if cat.Vendor("nokia") == nil {
+		t.Fatal("symlinked vendor directory was not loaded")
+	}
+	if cat.Variant("nokia-srlinux") == nil {
+		t.Fatal("symlinked variant directory was not loaded")
+	}
+}
+
+func TestQuotedModuleValueUsesPythonBool(t *testing.T) {
+	cat := mustLoad(t, writeTree(t, map[string]string{"modules.yaml": `modules:
+  quoted-false: "false"
+  quoted-empty: ""
+  plain-off: off
+  plain-on: on
+`}))
+	reg := cat.Modules()
+	if !reg.DefaultFor("quoted-false") {
+		t.Fatal(`quoted "false" must be true (Python bool("false"))`)
+	}
+	if reg.DefaultFor("quoted-empty") {
+		t.Fatal(`quoted "" must be false`)
+	}
+	if reg.DefaultFor("plain-off") || !reg.DefaultFor("plain-on") {
+		t.Fatalf("plain on/off resolved wrongly: on=%v off=%v",
+			reg.DefaultFor("plain-on"), reg.DefaultFor("plain-off"))
+	}
+}
+
+func TestDuplicateVariantKeyAcrossVendorsNamesBothFiles(t *testing.T) {
+	wantLoadError(t, fullTree(t, map[string]string{"juniper/dupe/common.yaml": srlinuxCommon}),
+		"duplicate variant key 'nokia-srlinux'",
+		"juniper/dupe/common.yaml", "nokia/srlinux/common.yaml")
+}

@@ -25,8 +25,15 @@ const graphqlQuery = `query ($tag: [String!]) {
   }
 }`
 
-// httpx defaults to a 5s timeout; keep pulls from hanging forever.
-var netboxClient = &http.Client{Timeout: 5 * time.Second}
+// httpx defaults to a 5s timeout; keep pulls from hanging forever. Python's
+// client has follow_redirects=False and raise_for_status rejects 3xx, so never
+// replay the API token to a redirect target (which could downgrade to http).
+var netboxClient = &http.Client{
+	Timeout: 5 * time.Second,
+	CheckRedirect: func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	},
+}
 
 // NetBoxSource pulls tag-scoped devices from NetBox over GraphQL.
 type NetBoxSource struct {
@@ -89,6 +96,9 @@ func (s *NetBoxSource) Fetch() ([]Target, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
+		return nil, fmt.Errorf("Redirect response '%s' for url '%s'", resp.Status, req.URL)
+	}
 	if resp.StatusCode >= 400 {
 		kind := "Client error"
 		if resp.StatusCode >= 500 {

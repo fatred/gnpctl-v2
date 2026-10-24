@@ -184,6 +184,9 @@ func logLevel(level string) slog.Level {
 		return slog.LevelWarn
 	case "ERROR":
 		return slog.LevelError
+	case "CRITICAL", "FATAL":
+		// Python's CRITICAL (50) is above ERROR (40): error records are suppressed.
+		return slog.LevelError + 1
 	}
 	return slog.LevelInfo
 }

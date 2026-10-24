@@ -198,3 +198,41 @@ func TestNonMappingYangEntryRejected(t *testing.T) {
 		t.Fatalf("error = %v", err)
 	}
 }
+
+func TestReleaseVersionTieIsDeterministic(t *testing.T) {
+	cat := mustLoad(t, writeTree(t, map[string]string{
+		"modules.yaml":              yangModules,
+		"nokia/vendor.yaml":         yangNokiaVendor,
+		"nokia/srlinux/common.yaml": yangSrlinuxCommon,
+		"yang/nokia/4.32.0F.yaml":   yangV2410,
+		"yang/nokia/4.32.0M.yaml":   yangV2503,
+	}))
+	version := "4.33.1F"
+	for i := 0; i < 100; i++ {
+		sel := cat.Yang().SelectRelease("nokia", &version)
+		if sel.Release == nil || *sel.Release != "4.32.0M" {
+			t.Fatalf("run %d: selection = %+v, want 4.32.0M", i, sel)
+		}
+	}
+}
+
+func TestYangVendorsAreSorted(t *testing.T) {
+	cat := mustLoad(t, writeTree(t, map[string]string{
+		"modules.yaml":        yangModules,
+		"yang/zebra/v1.yaml":  yangV2410,
+		"yang/arista/v1.yaml": yangV2410,
+		"yang/middle/v1.yaml": yangV2410,
+	}))
+	want := []string{"arista", "middle", "zebra"}
+	for i := 0; i < 100; i++ {
+		got := cat.Yang().Vendors()
+		if len(got) != len(want) {
+			t.Fatalf("run %d: vendors = %v", i, got)
+		}
+		for j := range want {
+			if got[j] != want[j] {
+				t.Fatalf("run %d: vendors = %v, want %v", i, got, want)
+			}
+		}
+	}
+}
