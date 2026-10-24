@@ -419,3 +419,26 @@ render:
 `
 	wantContains(t, loadErr(t, cfg), "render.nats.output.num_workers", "int_from_float")
 }
+
+func TestLoggingCriticalSuppressesErrorRecords(t *testing.T) {
+	for _, level := range []string{"critical", "fatal"} {
+		t.Run(level, func(t *testing.T) {
+			logfile := filepath.Join(t.TempDir(), "out.log")
+			prev := slog.Default()
+			t.Cleanup(func() { slog.SetDefault(prev) })
+
+			if err := SetupLogging(&Config{Log: LogConfig{Path: logfile, Level: level}}); err != nil {
+				t.Fatal(err)
+			}
+			slog.Error("should-not-appear")
+
+			data, err := os.ReadFile(logfile)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strings.Contains(string(data), "should-not-appear") {
+				t.Fatalf("%s level logged an error record: %q", level, data)
+			}
+		})
+	}
+}
