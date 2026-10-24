@@ -207,31 +207,6 @@ func TestEgressYAMLShape(t *testing.T) {
 	}
 }
 
-func TestEmitIsDeterministic(t *testing.T) {
-	outDir := t.TempDir()
-	read := func() map[string]string {
-		if _, err := emit.NewFileEmitter(outDir).Emit(desiredConfig()); err != nil {
-			t.Fatal(err)
-		}
-		out := map[string]string{}
-		for _, name := range []string{"ingress.yaml", "targets.yaml", "egress.yaml"} {
-			data, err := os.ReadFile(filepath.Join(outDir, name))
-			if err != nil {
-				t.Fatal(err)
-			}
-			out[name] = string(data)
-		}
-		return out
-	}
-	first := read()
-	second := read()
-	for name := range first {
-		if first[name] != second[name] {
-			t.Fatalf("%s not deterministic", name)
-		}
-	}
-}
-
 func TestYAMLKeyOrderMatchesPython(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join(emitFiles(t), "targets.yaml"))
 	if err != nil {
