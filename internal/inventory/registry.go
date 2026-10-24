@@ -1,0 +1,77 @@
+// Package inventory is the configured-source registry: built-in source types
+// plus validated source construction.
+package inventory
+
+import (
+	"fmt"
+	"sort"
+	"strings"
+
+	"github.com/fatred/gnpctl-v2/internal/inventory/sources"
+)
+
+// UnknownSourceType is returned when a source type has no built-in registration.
+type UnknownSourceType struct {
+	Name string
+}
+
+func (e *UnknownSourceType) Error() string {
+	available := make([]string, 0, len(sourceTypes))
+	for name := range sourceTypes {
+		available = append(available, name)
+	}
+	sort.Strings(available)
+	joined := strings.Join(available, ", ")
+	if joined == "" {
+		joined = "(none)"
+	}
+	return fmt.Sprintf("unknown source type '%s'; available: %s", e.Name, joined)
+}
+
+// SourceType is one built-in source-type registration.
+type SourceType struct {
+	Validate func(params map[string]string, credentialRef string) error
+	New      func(params map[string]string, credentialRef string) sources.Source
+}
+
+var sourceTypes = map[string]SourceType{
+	sources.NornirType: {
+		Validate: sources.ValidateNornirParams,
+		New: func(params map[string]string, credentialRef string) sources.Source {
+			return &sources.NornirSource{Params: params, CredentialRef: credentialRef}
+		},
+	},
+	sources.NetBoxType: {
+		Validate: sources.ValidateNetBoxParams,
+		New: func(params map[string]string, credentialRef string) sources.Source {
+			return &sources.NetBoxSource{Params: params, CredentialRef: credentialRef}
+		},
+	},
+}
+
+// Lookup resolves a source-type name to its built-in registration.
+func Lookup(typeName string) (SourceType, error) {
+	sourceType, ok := sourceTypes[typeName]
+	if !ok {
+		return SourceType{}, &UnknownSourceType{Name: typeName}
+	}
+	return sourceType, nil
+}
+
+// ValidateParams validates params against the named source type.
+func ValidateParams(typeName string, params map[string]string, credentialRef string) error {
+	sourceType, err := Lookup(typeName)
+	if err != nil {
+		return err
+	}
+	return sourceType.Validate(params, credentialRef)
+}
+
+// Instantiate builds a source instance for the named source type.
+func Instantiate(typeName string, params map[string]string, credentialRef string) (sources.Source, error) {
+	sourceType, err := Lookup(typeName)
+	if err != nil {
+		return nil, err
+	}
+	return sourceType.New(params, credentialRef), nil
+}
