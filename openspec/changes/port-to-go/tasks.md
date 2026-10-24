@@ -1,6 +1,6 @@
 Detailed steps, files, interfaces and tests: `docs/plans/2026-10-24-port-to-go.md` (task numbers match).
 
-- [ ] 1. Scaffold, fixtures, golden files from Python
+- [x] 1. Scaffold, fixtures, golden files from Python
 - [ ] 2. config
 - [ ] 3. state (SQLite, `mod_*` columns)
 - [ ] 4. catalog (layered loader, YANG facts, effective profile)
