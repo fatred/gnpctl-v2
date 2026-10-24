@@ -34,8 +34,8 @@ Commands, flags and the config file are unchanged from the Python version; see i
 
 ## Differences from the Python version
 
-- TLS: the device certificate is verified against system roots or `tls_ca` (pygnmi trusted whatever certificate the device presented). Lab devices with self-signed certificates need `tls_ca` or `skip_verify`.
-- Rendered YAML is semantically identical but formatted by `yaml.v3` (indented sequences, different quoting); gnmic reads both.
+- TLS: the device certificate is verified against system roots or `tls_ca` (pygnmi trusted whatever certificate the device presented). Lab devices with self-signed certificates need `GNMI_TLS_CA` pointing at the device CA (there is no discovery-side skip-verify; `render.gnmic.skip_verify` only affects the rendered gnmic config).
+- Rendered YAML is structurally identical (same keys, order and values) but formatted by `yaml.v3` (indented sequences, different quoting), not byte-identical to PyYAML output.
 - Config/catalog validation messages keep file, field and message but drop pydantic's `[type=…]` suffix and URL.
 - Duplicate YAML keys in config/catalog files are an error.
 
