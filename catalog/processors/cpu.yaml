@@ -1,0 +1,37 @@
+# CPU utilization (egress, gnmic 0.46). Normalize the per-vendor "instant" CPU
+# utilization leaf to one common metric:
+#   cpu_utilization  gauge (percent)
+#   labels: path keys gnmic emits as tags (slot/index on SRL, component on Junos).
+#
+# Verified leaves:
+#   nokia-srlinux : /platform/control/cpu/total/instant
+#       (srl_nokia-platform-cpu.yang v24.10: container `total` -> leaf `instant`, percentage)
+#   juniper-mx    : /components/component/cpu/utilization/state/instant   (OpenConfig)
+#   juniper-qfx   : /system/cpus/cpu/state/total/instant                  (OpenConfig)
+# All end in `instant` under a cpu path, so `.*cpu.*instant$` matches all three.
+# SRL subscribes the single instant leaf; the juniper subtrees also emit avg/min/max,
+# which cpu-keep prunes. Validated on live SRL: cpu_utilization with slot/index tags.
+
+# Rename the instant CPU utilization leaf to the common metric name.
+cpu-rename:
+  event-strings:
+    value-names:
+      - ".*cpu.*instant$"
+    transforms:
+      - replace:
+          apply-on: name
+          old: ".*cpu.*instant$"
+          new: cpu_utilization
+
+# Ensure numeric (percentages may arrive as a string).
+cpu-convert:
+  event-convert:
+    value-names:
+      - "^cpu_utilization$"
+    type: float
+
+# gnmic emits one event per leaf; keep only cpu_utilization (drop avg/min/max etc.).
+cpu-keep:
+  event-allow:
+    value-names:
+      - "^cpu_utilization$"

@@ -1,0 +1,28 @@
+exit=0
+leaf1 [nokia-srlinux]
+  ports                 on
+  processors            on
+  mempools              on
+  storage               on
+  sensors               on
+  environment           on
+  entity-physical       off
+  transceivers          on
+  services              on
+  bgp-peers             forced-off
+  ospf                  off
+  ospfv3                off
+  isis                  off
+  bfd                   off
+  mpls                  off
+  route                 off
+  vlans                 off
+  stp                   off
+  fdb-table             off
+  arp-table             off
+  ntp                   off
+  wireless              off
+  discovery-protocols   off
+  mac-accounting        off
+  acl                   off
+  forwarding-resources  off

@@ -1,0 +1,87 @@
+oc-bgp-neighbor-session-state:
+  model: openconfig-bgp-neighbor
+  path: /network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/session-state
+  type: enumeration
+  enum:
+  - IDLE
+  - CONNECT
+  - ACTIVE
+  - OPENSENT
+  - OPENCONFIRM
+  - ESTABLISHED
+oc-isis-adjacency-state:
+  model: openconfig-isis
+  path: /network-instances/network-instance/protocols/protocol/isis/interfaces/interface/levels/level/adjacencies/adjacency/state/adjacency-state
+  type: enumeration
+  enum:
+  - UP
+  - DOWN
+  - INIT
+  - FAILED
+oc-component-oper-status:
+  model: openconfig-platform
+  path: /components/component/state/oper-status
+  type: identityref
+  enum:
+  - ACTIVE
+  - INACTIVE
+  - DISABLED
+oc-cpu-utilization-instant:
+  model: openconfig-types
+  path: /components/component/cpu/utilization/state/instant
+  type: uint8
+oc-component-memory-available:
+  model: openconfig-platform
+  path: /components/component/state/memory/available
+  type: uint64
+  units: bytes
+oc-component-memory-utilized:
+  model: openconfig-platform
+  path: /components/component/state/memory/utilized
+  type: uint64
+  units: bytes
+oc-xcvr-input-power-instant:
+  model: openconfig-types
+  path: /components/component/transceiver/physical-channels/channel/state/input-power/instant
+  type: decimal64
+  units: dBm
+oc-xcvr-output-power-instant:
+  model: openconfig-types
+  path: /components/component/transceiver/physical-channels/channel/state/output-power/instant
+  type: decimal64
+  units: dBm
+oc-xcvr-laser-bias-instant:
+  model: openconfig-types
+  path: /components/component/transceiver/physical-channels/channel/state/laser-bias-current/instant
+  type: decimal64
+  units: mA
+oc-system-memory-physical:
+  model: openconfig-system
+  path: /system/memory/state/physical
+  type: uint64
+  units: bytes
+oc-system-memory-reserved:
+  model: openconfig-system
+  path: /system/memory/state/reserved
+  type: uint64
+  units: bytes
+oc-system-mount-point-size:
+  model: openconfig-system
+  path: /system/mount-points/mount-point/state/size
+  type: uint64
+  units: megabytes
+oc-system-mount-point-available:
+  model: openconfig-system
+  path: /system/mount-points/mount-point/state/available
+  type: uint64
+  units: megabytes
+oc-system-mount-point-utilized:
+  model: openconfig-system
+  path: /system/mount-points/mount-point/state/utilized
+  type: uint64
+  units: megabytes
+oc-component-temperature-instant:
+  model: openconfig-platform-types
+  path: /components/component/state/temperature/instant
+  type: decimal64
+  units: celsius

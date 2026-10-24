@@ -1,0 +1,11 @@
+{
+  "/components/component[name=*]/state": {
+    "/components/component[name=Chassis]/state/type": "CHASSIS",
+    "/components/component[name=Chassis]/state/description": "QFX10002-72Q",
+    "/components/component[name=Routing Engine0]/state/type": "CONTROLLER_CARD",
+    "/components/component[name=Routing Engine0]/state/description": "RE-QFX10002-72Q",
+    "/components/component[name=Routing Engine0]/state/software-version": "23.4R2-S6.6",
+    "/components/component[name=FPC0]/state/type": "LINECARD",
+    "/components/component[name=FPC0]/state/description": "QFX10002-72Q"
+  }
+}

@@ -1,0 +1,37 @@
+# gnpctl module registry — canonical module names and their global default
+# enablement. Names are LibreNMS-style (plus a few gnpctl-specific ones). A
+# variant's common.yaml or a version layer may override a module's default; per
+# device, `gnpctl modules` pins force-on/force-off. `on`/`off` parse to booleans.
+#
+# Default ON: the common, broadly safe-to-poll modules.
+# Default OFF: routing/protocol and high-cardinality modules, enabled per device.
+modules:
+  # --- default on ---
+  ports: on
+  processors: on
+  mempools: on
+  storage: on
+  sensors: on
+  environment: on  # component temperature + fan speed (health)
+  entity-physical: on
+  transceivers: on
+  services: on
+  # --- default off (enable per device) ---
+  bgp-peers: off
+  ospf: off
+  ospfv3: off
+  isis: off
+  bfd: off
+  mpls: off
+  route: off
+  vlans: off
+  stp: off
+  fdb-table: off
+  arp-table: off
+  ntp: off
+  wireless: off
+  discovery-protocols: off
+  mac-accounting: off
+  # --- gnpctl-specific ---
+  acl: off
+  forwarding-resources: off

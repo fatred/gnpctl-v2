@@ -1,0 +1,404 @@
+# Seed list for the yang-facts extractor (hwtest/yang_facts.py).
+#
+# Each fact names the YANG object a normalized metric derives from; the extractor
+# fetches the model from the pinned release branch (gh) and writes its type/units/enum
+# into catalog/yang/<vendor>/<release>.yaml — the source of truth a metric is validated
+# against. Regenerate with:  make yang-facts VENDOR=nokia RELEASE=24.10
+#
+#   leaf:    extract this leaf's type (with `within` to scope a generic name)
+#   typedef: extract a named typedef directly (value rides a shared typedef, no leaf)
+#   within:  grouping/container/list to scope the leaf search
+#
+# Nokia uses SR Linux native models; Juniper uses OpenConfig models (vendored in the
+# Juniper/yang repo under the release path).
+
+releases:
+  nokia:
+    "24.10":                            # release key (no v — consistent with SR OS 25.10)
+      repo: nokia/srlinux-yang-models
+      ref: v24.10                        # upstream branch tag (keeps its v)
+      prefix: srlinux-yang-models/srl_nokia/models
+      type_files:
+        - common/srl_nokia-common.yang
+        - network-instance/srl_nokia-isis-types.yang
+  juniper:
+    23.4R2:
+      repo: Juniper/yang
+      ref: master
+      prefix: 23.4/23.4R2/openconfig/models
+      type_files:
+        - openconfig-isis-types.yang
+        - openconfig-platform-types.yang
+        - openconfig-types.yang
+  nokia-sros:
+    "25.10":
+      repo: nokia/7x50_YangModels
+      ref: master
+      prefix: latest_sros_25.10        # native nokia-state-* + vendored openconfig/ under here
+      type_files:
+        - nokia-types-sros.yang
+        - nokia-types-bgp.yang
+        - nokia-types-isis.yang
+        - nokia-types-port.yang
+        - nokia-types-chassis.yang
+        - nokia-types-system.yang
+        - nokia-types-router.yang
+
+facts:
+  # --- state (enum) metrics: the high-value coverage facts ---
+  srl-bgp-neighbor-session-state:
+    vendor: nokia
+    file: network-instance/srl_nokia-bgp.yang
+    model: srl_nokia-bgp
+    leaf: session-state
+    within: neighbor-state
+    path: /network-instance/protocols/bgp/neighbor/session-state
+
+  srl-isis-adjacency-state:
+    vendor: nokia
+    file: network-instance/srl_nokia-isis.yang
+    model: srl_nokia-isis
+    leaf: state
+    within: isis-adjacency-state
+    path: /network-instance/protocols/isis/instance/interface/adjacency/state
+
+  srl-platform-oper-state:
+    vendor: nokia
+    file: common/srl_nokia-common.yang
+    model: srl_nokia-common
+    typedef: oper-state
+    path: /platform/power-supply/oper-state
+
+  # --- numeric metrics ---
+  srl-cpu-instant:
+    vendor: nokia
+    file: platform/srl_nokia-platform-cpu.yang
+    model: srl_nokia-platform-cpu
+    leaf: instant
+    within: per-type-statistics
+    path: /platform/control/cpu/total/instant
+
+  srl-memory-physical:
+    vendor: nokia
+    file: platform/srl_nokia-platform-memory.yang
+    model: srl_nokia-platform-memory
+    leaf: physical
+    within: memory-state-top
+    path: /platform/control/memory/physical
+
+  srl-memory-reserved:
+    vendor: nokia
+    file: platform/srl_nokia-platform-memory.yang
+    model: srl_nokia-platform-memory
+    leaf: reserved
+    within: memory-state-top
+    path: /platform/control/memory/reserved
+
+  srl-memory-free:
+    vendor: nokia
+    file: platform/srl_nokia-platform-memory.yang
+    model: srl_nokia-platform-memory
+    leaf: free
+    within: memory-state-top
+    path: /platform/control/memory/free
+
+  srl-memory-utilization:
+    vendor: nokia
+    file: platform/srl_nokia-platform-memory.yang
+    model: srl_nokia-platform-memory
+    leaf: utilization
+    within: memory-state-top
+    path: /platform/control/memory/utilization
+
+  srl-disk-size:
+    vendor: nokia
+    file: platform/srl_nokia-platform-disk.yang
+    model: srl_nokia-platform-disk
+    leaf: size
+    within: partition
+    path: /platform/control/disk/partition/size
+
+  srl-disk-used:
+    vendor: nokia
+    file: platform/srl_nokia-platform-disk.yang
+    model: srl_nokia-platform-disk
+    leaf: used
+    within: partition
+    path: /platform/control/disk/partition/used
+
+  srl-disk-free:
+    vendor: nokia
+    file: platform/srl_nokia-platform-disk.yang
+    model: srl_nokia-platform-disk
+    leaf: free
+    within: partition
+    path: /platform/control/disk/partition/free
+
+  srl-disk-percent-used:
+    vendor: nokia
+    file: platform/srl_nokia-platform-disk.yang
+    model: srl_nokia-platform-disk
+    leaf: percent-used
+    within: partition
+    path: /platform/control/disk/partition/percent-used
+
+  srl-xcvr-input-power:
+    vendor: nokia
+    file: interfaces/srl_nokia-interfaces.yang
+    model: srl_nokia-interfaces
+    leaf: latest-value
+    within: input-power
+    path: /interface/transceiver/input-power/latest-value
+
+  srl-xcvr-output-power:
+    vendor: nokia
+    file: interfaces/srl_nokia-interfaces.yang
+    model: srl_nokia-interfaces
+    leaf: latest-value
+    within: output-power
+    path: /interface/transceiver/output-power/latest-value
+
+  srl-xcvr-laser-bias-current:
+    vendor: nokia
+    file: interfaces/srl_nokia-interfaces.yang
+    model: srl_nokia-interfaces
+    leaf: latest-value
+    within: laser-bias-current
+    path: /interface/transceiver/laser-bias-current/latest-value
+
+  srl-xcvr-temperature:
+    vendor: nokia
+    file: interfaces/srl_nokia-interfaces.yang
+    model: srl_nokia-interfaces
+    leaf: latest-value
+    within: temperature
+    path: /interface/transceiver/temperature/latest-value
+
+  # --- juniper (OpenConfig) ---
+  oc-bgp-neighbor-session-state:
+    vendor: juniper
+    file: openconfig-bgp-neighbor.yang
+    model: openconfig-bgp-neighbor
+    leaf: session-state
+    path: /network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/session-state
+
+  oc-isis-adjacency-state:
+    vendor: juniper
+    file: openconfig-isis.yang
+    model: openconfig-isis
+    leaf: adjacency-state
+    within: adjacency-state
+    path: /network-instances/network-instance/protocols/protocol/isis/interfaces/interface/levels/level/adjacencies/adjacency/state/adjacency-state
+
+  oc-component-oper-status:
+    vendor: juniper
+    file: openconfig-platform.yang
+    model: openconfig-platform
+    leaf: oper-status
+    path: /components/component/state/oper-status
+
+  oc-cpu-utilization-instant:
+    vendor: juniper
+    file: openconfig-types.yang
+    model: openconfig-types
+    leaf: instant
+    within: avg-min-max-instant-stats-pct
+    path: /components/component/cpu/utilization/state/instant
+
+  oc-component-memory-available:
+    vendor: juniper
+    file: openconfig-platform.yang
+    model: openconfig-platform
+    leaf: available
+    within: platform-component-memory-state
+    path: /components/component/state/memory/available
+
+  oc-component-memory-utilized:
+    vendor: juniper
+    file: openconfig-platform.yang
+    model: openconfig-platform
+    leaf: utilized
+    within: platform-component-memory-state
+    path: /components/component/state/memory/utilized
+
+  oc-xcvr-input-power-instant:
+    vendor: juniper
+    file: openconfig-types.yang
+    model: openconfig-types
+    leaf: instant
+    within: avg-min-max-instant-stats-precision2-dBm
+    path: /components/component/transceiver/physical-channels/channel/state/input-power/instant
+
+  oc-xcvr-output-power-instant:
+    vendor: juniper
+    file: openconfig-types.yang
+    model: openconfig-types
+    leaf: instant
+    within: avg-min-max-instant-stats-precision2-dBm
+    path: /components/component/transceiver/physical-channels/channel/state/output-power/instant
+
+  oc-xcvr-laser-bias-instant:
+    vendor: juniper
+    file: openconfig-types.yang
+    model: openconfig-types
+    leaf: instant
+    within: avg-min-max-instant-stats-precision2-mA
+    path: /components/component/transceiver/physical-channels/channel/state/laser-bias-current/instant
+
+  # juniper-qfx (Broadcom leaf role) reads cpu/memory/disk from /system
+  oc-system-memory-physical:
+    vendor: juniper
+    file: openconfig-system.yang
+    model: openconfig-system
+    leaf: physical
+    within: system-memory-state
+    path: /system/memory/state/physical
+
+  oc-system-memory-reserved:
+    vendor: juniper
+    file: openconfig-system.yang
+    model: openconfig-system
+    leaf: reserved
+    within: system-memory-state
+    path: /system/memory/state/reserved
+
+  oc-system-mount-point-size:
+    vendor: juniper
+    file: openconfig-system.yang
+    model: openconfig-system
+    leaf: size
+    within: mount-point-state
+    path: /system/mount-points/mount-point/state/size
+
+  oc-system-mount-point-available:
+    vendor: juniper
+    file: openconfig-system.yang
+    model: openconfig-system
+    leaf: available
+    within: mount-point-state
+    path: /system/mount-points/mount-point/state/available
+
+  oc-system-mount-point-utilized:
+    vendor: juniper
+    file: openconfig-system.yang
+    model: openconfig-system
+    leaf: utilized
+    within: mount-point-state
+    path: /system/mount-points/mount-point/state/utilized
+
+  # --- nokia SR OS (native /state/ submodules; vendored openconfig/ under the prefix) ---
+  # BGP session-state is a YANG string (no enum) -> the metric declares yang_enum: false.
+  sros-bgp-session-state:
+    vendor: nokia-sros
+    file: nokia-submodule/nokia-state-router-bgp.yang
+    model: nokia-state-router-bgp
+    leaf: session-state
+    within: neighbor
+    path: /state/service/vprn/bgp/neighbor/statistics/session-state
+  sros-port-oper-state:
+    vendor: nokia-sros
+    file: nokia-types-port.yang
+    model: nokia-types-port
+    typedef: port-oper-state
+    path: /state/port/oper-state
+  sros-hw-oper-state:
+    vendor: nokia-sros
+    file: nokia-types-chassis.yang
+    model: nokia-types-chassis
+    typedef: hw-oper-state
+    path: /state/chassis/power-supply/oper-state
+  sros-cpu-usage:
+    vendor: nokia-sros
+    file: nokia-submodule/nokia-state-system.yang
+    model: nokia-state-system
+    leaf: cpu-usage
+    within: usage
+    path: /state/system/cpu/summary/usage/cpu-usage
+  sros-memory-total:
+    vendor: nokia-sros
+    file: nokia-submodule/nokia-state-system.yang
+    model: nokia-state-system
+    leaf: current-total-size
+    within: memory-pools
+    path: /state/system/memory-pools/summary/current-total-size
+  sros-memory-used:
+    vendor: nokia-sros
+    file: nokia-submodule/nokia-state-system.yang
+    model: nokia-state-system
+    leaf: total-in-use
+    within: memory-pools
+    path: /state/system/memory-pools/summary/total-in-use
+  sros-memory-available:
+    vendor: nokia-sros
+    file: nokia-submodule/nokia-state-system.yang
+    model: nokia-state-system
+    leaf: available-memory
+    within: memory-pools
+    path: /state/system/memory-pools/summary/available-memory
+  sros-xcvr-input-power:
+    vendor: nokia-sros
+    file: nokia-submodule/nokia-state-port.yang
+    model: nokia-state-port
+    leaf: current
+    within: received-optical-power
+    path: /state/port/transceiver/digital-diagnostic-monitoring/received-optical-power/current
+  sros-xcvr-output-power:
+    vendor: nokia-sros
+    file: nokia-submodule/nokia-state-port.yang
+    model: nokia-state-port
+    leaf: current
+    within: transmit-output-power
+    path: /state/port/transceiver/digital-diagnostic-monitoring/transmit-output-power/current
+  sros-xcvr-laser-bias:
+    vendor: nokia-sros
+    file: nokia-submodule/nokia-state-port.yang
+    model: nokia-state-port
+    leaf: current
+    within: transmit-bias-current
+    path: /state/port/transceiver/digital-diagnostic-monitoring/transmit-bias-current/current
+  sros-isis-adjacency-oper-state:
+    vendor: nokia-sros
+    file: nokia-submodule/nokia-state-svc-vprn-isis.yang
+    model: nokia-state-svc-vprn-isis
+    leaf: oper-state
+    within: adjacency
+    path: /state/service/vprn/isis/interface/adjacency/oper-state
+  sros-temperature:
+    vendor: nokia-sros
+    file: nokia-submodule/nokia-state-chassis.yang
+    model: nokia-state-chassis
+    leaf: temperature
+    within: hardware-data
+    path: /state/chassis/hardware-data/temperature
+  sros-fan-speed-percent:
+    vendor: nokia-sros
+    file: nokia-submodule/nokia-state-chassis.yang
+    model: nokia-state-chassis
+    leaf: speed
+    within: fan
+    path: /state/chassis/fan/speed
+
+  # --- environment (temperature + fan) facts: juniper OpenConfig ---
+  oc-component-temperature-instant:
+    vendor: juniper
+    file: openconfig-platform-types.yang
+    model: openconfig-platform-types
+    leaf: instant
+    within: avg-min-max-instant-stats-precision1-celsius
+    path: /components/component/state/temperature/instant
+
+  # --- environment (temperature + fan) facts: nokia SR Linux native ---
+  srl-temperature:
+    vendor: nokia
+    file: platform/srl_nokia-platform.yang
+    model: srl_nokia-platform
+    leaf: instant
+    within: component-temperature-common
+    path: /platform/control[slot=*]/temperature/instant   # also fabric[slot=*]
+  srl-fan-speed-percent:
+    vendor: nokia
+    file: platform/srl_nokia-platform-fan.yang
+    model: srl_nokia-platform-fan
+    leaf: speed
+    within: fan-state-top
+    path: /platform/fan-tray/speed

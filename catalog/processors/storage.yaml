@@ -1,0 +1,77 @@
+# Storage (egress, gnmic 0.46). Normalize per-vendor filesystem leaves to common
+# metrics:
+#   storage_total_bytes / storage_used_bytes / storage_free_bytes /
+#   storage_utilization (percent)
+#   labels: path keys gnmic emits as tags (disk/partition name on SRL,
+#           mount-point name on Junos).
+#
+# Verified leaves:
+#   nokia-srlinux : /platform/control/disk/partition/{size,used,free,percent-used}
+#       (srl_nokia-platform-disk.yang v24.10: size/used/free = uint64 bytes; percent-used = percentage)
+#   juniper-qfx   : /system/mount-points/mount-point/state/{size,used,available,...} (OpenConfig)
+# (juniper-mx has no storage module — it's a core/spine variant.)
+#
+# Vendors emit only the subset they expose, under the shared names. SRL emits the
+# byte/percentage leaves as JSON strings, so storage-convert (-> float) is required.
+# Validated on prod Juniper too (site A QFX5k @ 23.4R2; juniper-qfx leaf role).
+#
+# Validated on live SRL (clab, gnmic 0.46): per partition storage_total_bytes/
+# storage_used_bytes/storage_free_bytes/storage_utilization, with disk_name +
+# partition_name tags. NB: the containerized SRL reports used/free/percent-used as 0
+# (no real disk accounting in clab); real hardware populates them.
+
+# Map each recognised filesystem leaf to its common metric name. Suffixes are
+# slash-anchored so `/used` does not also catch `percent-used`.
+storage-rename:
+  event-strings:
+    value-names:
+      - ".*/size$"
+      - ".*/used$"
+      - ".*/utilized$"
+      - ".*/free$"
+      - ".*/available$"
+      - ".*/percent-used$"
+    transforms:
+      - replace:
+          apply-on: name
+          old: ".*/size$"
+          new: storage_total_bytes
+      - replace:
+          apply-on: name
+          old: ".*/used$"
+          new: storage_used_bytes
+      - replace:
+          apply-on: name
+          old: ".*/utilized$"
+          new: storage_used_bytes
+      - replace:
+          apply-on: name
+          old: ".*/free$"
+          new: storage_free_bytes
+      - replace:
+          apply-on: name
+          old: ".*/available$"
+          new: storage_free_bytes
+      - replace:
+          apply-on: name
+          old: ".*/percent-used$"
+          new: storage_utilization
+
+# SRL emits uint64/percentage as JSON strings; coerce to numeric for Prometheus.
+storage-convert:
+  event-convert:
+    value-names:
+      - "^storage_total_bytes$"
+      - "^storage_used_bytes$"
+      - "^storage_free_bytes$"
+      - "^storage_utilization$"
+    type: float
+
+# Keep only the common metrics; drop the rest of the partition/mount-point subtree.
+storage-keep:
+  event-allow:
+    value-names:
+      - "^storage_total_bytes$"
+      - "^storage_used_bytes$"
+      - "^storage_free_bytes$"
+      - "^storage_utilization$"

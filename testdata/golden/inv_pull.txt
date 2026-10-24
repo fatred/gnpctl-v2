@@ -1,0 +1,2 @@
+exit=0
+pulled 2 target(s) from 1 source(s)

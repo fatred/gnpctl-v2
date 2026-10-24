@@ -1,0 +1,333 @@
+# Nokia SR Linux variant — production subscription paths (verbatim from the
+# gnmic ingestor), grouped into modules. SR Linux native paths, proto encoding,
+# stream-mode sample. The OS-level split (SR Linux vs SR OS) resolves from
+# capabilities (models_any: srl_nokia); SR OS is added later as a sibling variant.
+#
+# Not included (do not fit a platform-wide catalog):
+#   - DCI frame-size counters hardcoded to specific interfaces (e.g. ethernet-1/27)
+#   - the leaf/spine-vs-core split: ISIS is core-only in the ingestor and is
+#     carried here as part of the platform superset (enable per device).
+key: nokia-srlinux
+vendor: nokia
+platform_match:
+  models_any: ["srl_nokia"]
+default_port: 57400
+encoding: proto
+platform_hints: ["nokia_srl", "nokia_srlinux"]
+
+modules:
+  processors:
+    processors: [cpu-rename, cpu-convert, cpu-keep]
+    metrics:
+      cpu_utilization:
+        type: numeric
+        federate: true
+        yang: srl-cpu-instant
+    paths:
+      - key: stats-cpu
+        path: /platform/control[slot=*]/cpu[index=*]/total/instant
+        mode: sample
+        sample_interval: 15s
+        yang: srl-cpu-instant
+        description: "Control-plane CPU utilisation"
+
+  mempools:
+    processors: [memory-rename, memory-convert, memory-keep]
+    metrics:
+      memory_total_bytes:
+        type: numeric
+        federate: true
+        yang: srl-memory-physical
+      memory_free_bytes:
+        type: numeric
+        federate: true
+        yang: srl-memory-free
+      memory_reserved_bytes:
+        type: numeric
+        federate: true
+        yang: srl-memory-reserved
+      memory_utilization:
+        type: numeric
+        federate: true
+        yang: srl-memory-utilization
+    paths:
+      - key: stats-memory
+        path: /platform/control[slot=*]/memory
+        mode: sample
+        sample_interval: 15s
+        description: "Control-plane memory utilisation"
+
+  storage:
+    processors: [storage-rename, storage-convert, storage-keep]
+    metrics:
+      storage_total_bytes:
+        type: numeric
+        federate: true
+        yang: srl-disk-size
+      storage_used_bytes:
+        type: numeric
+        federate: true
+        yang: srl-disk-used
+      storage_free_bytes:
+        type: numeric
+        federate: true
+        yang: srl-disk-free
+      storage_utilization:
+        type: numeric
+        federate: true
+        yang: srl-disk-percent-used
+    paths:
+      - key: stats-disk
+        path: /platform/control[slot=*]/disk[name=*]/partition[name=*]
+        mode: sample
+        sample_interval: 15s
+        description: "Disk partition usage"
+
+  sensors:
+    processors: [sensors-state, sensors-keep]
+    metrics:
+      power_supply_state:
+        type: state
+        federate: true
+        yang: srl-platform-oper-state
+        required_labels:
+          - oper_state
+        map:
+          up: 1
+          down: 0
+          empty: -1
+          downloading: -1
+          booting: -1
+          starting: -1
+          failed: 0
+          synchronizing: -1
+          upgrading: -1
+          low-power: 0
+          degraded: 0
+          warm-reboot: -1
+          waiting: -1
+    paths:
+      - key: stats-power-supply
+        path: /platform/power-supply[id=*]/oper-state
+        mode: sample
+        sample_interval: 15s
+        yang: srl-platform-oper-state
+        description: "Power-supply operational state"
+
+  services:
+    paths:
+      - key: stats-event-handler
+        path: /system/event-handler/instance[name=*]/oper-state
+        mode: sample
+        sample_interval: 15s
+        description: "Event-handler (CDN script) state"
+
+  environment:
+    processors: [environment-temp-rename, environment-fan-rename, environment-convert, environment-keep]
+    metrics:
+      temperature_celsius:
+        type: numeric
+        federate: true
+        yang: srl-temperature
+      fan_speed_percent:   # this device's fan-tray exposes speed (percent), not speed-rpm
+        type: numeric
+        federate: true
+        yang: srl-fan-speed-percent
+    paths:   # control has the temperature container on every SR OS form factor (YANG:
+             # control + fabric `uses component-temperature`, but fabric/linecard are absent
+             # on fixed-config leaves — a path the device lacks fails the whole subscription,
+             # so only the universal control path is wired); fan-tray key=id
+      - key: control-temp
+        path: /platform/control[slot=*]/temperature/instant
+        mode: sample
+        sample_interval: 60s
+        description: "Control-module temperature"
+      - key: fan-speed-percent
+        path: /platform/fan-tray[id=*]/speed
+        mode: sample
+        sample_interval: 60s
+        description: "Fan-tray speed (percent)"
+
+  ports:
+    processors: [gnpctl-meta]
+    paths:
+      - key: intf-admin-state
+        path: /interface[name=*]/admin-state
+        mode: sample
+        sample_interval: 15s
+        description: "Interface admin state"
+      - key: intf-description
+        path: /interface/description
+        mode: sample
+        sample_interval: 15s
+        description: "Interface description"
+      - key: intf-oper-state
+        path: /interface[name=*]/oper-state
+        mode: sample
+        sample_interval: 15s
+        description: "Interface operational state"
+      - key: intf-port-speed
+        path: /interface[name=*]/ethernet/port-speed
+        mode: sample
+        sample_interval: 15s
+        description: "Interface ethernet port speed"
+      - key: intf-last-change
+        path: /interface[name=*]/last-change
+        mode: sample
+        sample_interval: 15s
+        description: "Interface last state change"
+      - key: intf-statistics
+        path: /interface[name=*]/statistics
+        mode: sample
+        sample_interval: 15s
+        description: "Interface statistics / counters"
+      - key: subintf-statistics
+        path: /interface[name=*]/subinterface[index=*]/statistics
+        mode: sample
+        sample_interval: 15s
+        description: "Subinterface statistics"
+
+  transceivers:
+    processors: [transceiver-rename, transceiver-convert, transceiver-keep]
+    metrics:
+      transceiver_input_power_dbm:
+        type: numeric
+        federate: true
+        yang: srl-xcvr-input-power
+      transceiver_output_power_dbm:
+        type: numeric
+        federate: true
+        yang: srl-xcvr-output-power
+      transceiver_laser_bias_ma:
+        type: numeric
+        federate: true
+        yang: srl-xcvr-laser-bias-current
+      transceiver_temperature_celsius:
+        type: numeric
+        federate: true
+        yang: srl-xcvr-temperature
+    paths:
+      - key: xcvr-channel-input-power
+        path: /interface[name=*]/transceiver/channel[index=*]/input-power
+        mode: sample
+        sample_interval: 15s
+        description: "Transceiver per-channel input power"
+      - key: xcvr-channel-output-power
+        path: /interface[name=*]/transceiver/channel[index=*]/output-power
+        mode: sample
+        sample_interval: 15s
+        description: "Transceiver per-channel output power"
+      - key: xcvr-channel-laser-bias
+        path: /interface[name=*]/transceiver/channel[index=*]/laser-bias-current/latest-value
+        mode: sample
+        sample_interval: 15s
+        description: "Transceiver per-channel laser bias current"
+      - key: xcvr-input-power
+        path: /interface[name=*]/transceiver/input-power
+        mode: sample
+        sample_interval: 15s
+        description: "Transceiver input power"
+      - key: xcvr-output-power
+        path: /interface[name=*]/transceiver/output-power
+        mode: sample
+        sample_interval: 15s
+        description: "Transceiver output power"
+      - key: xcvr-laser-bias
+        path: /interface[name=*]/transceiver/laser-bias-current/latest-value
+        mode: sample
+        sample_interval: 15s
+        description: "Transceiver laser bias current"
+      - key: xcvr-temperature
+        path: /interface[name=*]/transceiver/temperature/latest-value
+        mode: sample
+        sample_interval: 15s
+        description: "Transceiver temperature"
+
+  acl:
+    paths:
+      - key: fw-acl-matched-packets
+        path: /acl/acl-filter[name=*][type=*]/entry[sequence-id=*]/statistics/matched-packets
+        mode: sample
+        sample_interval: 15s
+        description: "ACL entry matched packets"
+
+  forwarding-resources:
+    paths:
+      - key: fw-tcam-resource
+        path: /platform/linecard[slot=*]/forwarding-complex[name=*]/tcam/resource[name=*]
+        mode: sample
+        sample_interval: 60s
+        description: "TCAM resource utilisation"
+      - key: fw-asic-resource
+        path: /platform/linecard[slot=*]/forwarding-complex[name=*]/datapath/asic/resource[name=*]
+        mode: sample
+        sample_interval: 60s
+        description: "ASIC datapath resource utilisation"
+      - key: fw-xdp-resource
+        path: /platform/linecard[slot=*]/forwarding-complex[name=*]/datapath/xdp/resource[name=*]
+        mode: sample
+        sample_interval: 60s
+        description: "XDP datapath resource utilisation"
+
+  bgp-peers:
+    default: on  # routing is globally off by default; SR Linux fleets run BGP everywhere
+    processors: [bgp-info, bgp-fsm, bgp-fsm-convert, bgp-rename, bgp-keep-state]
+    metrics:
+      bgp_neighbor_session_state:
+        type: state
+        federate: true
+        yang: srl-bgp-neighbor-session-state
+        map:
+          idle: 1
+          connect: 2
+          active: 3
+          opensent: 4
+          openconfirm: 5
+          established: 6
+      bgp_neighbor_peer_group:
+        type: info
+        federate: true
+        required_labels:
+          - peer_group
+      bgp_neighbor_description:
+        type: info
+        federate: true
+        required_labels:
+          - description
+    paths:
+      - key: bgp-session-state
+        path: /network-instance[name=*]/protocols/bgp/neighbor[peer-address=*]/session-state
+        mode: sample
+        sample_interval: 15s
+        yang: srl-bgp-neighbor-session-state
+        description: "BGP neighbor session state"
+      - key: bgp-neighbor-description
+        path: /network-instance/protocols/bgp/neighbor/description
+        mode: sample
+        sample_interval: 15s
+        description: "BGP neighbor description"
+      - key: bgp-neighbor-peer-group
+        path: /network-instance/protocols/bgp/neighbor/peer-group
+        mode: sample
+        sample_interval: 15s
+        description: "BGP neighbor peer-group"
+
+  isis:
+    processors: [isis-fsm, isis-fsm-convert, isis-rename, isis-keep-state]
+    metrics:
+      isis_adjacency_state:
+        type: state
+        federate: true
+        optional: true  # IS-IS is core-only — absent on roles that don't run it (e.g. leaves)
+        yang: srl-isis-adjacency-state
+        map:
+          up: 3
+          init: 2
+          down: 1
+          failed: 0
+    paths:
+      - key: isis-adjacency
+        path: /network-instance[name=*]/protocols/isis/instance[name=*]/interface[interface-name=*]/adjacency[neighbor-system-id=*]
+        mode: sample
+        sample_interval: 15s
+        description: "ISIS adjacency state (core role only in the source ingestor)"

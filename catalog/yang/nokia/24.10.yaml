@@ -1,0 +1,106 @@
+srl-bgp-neighbor-session-state:
+  model: srl_nokia-bgp
+  path: /network-instance/protocols/bgp/neighbor/session-state
+  type: enumeration
+  enum:
+  - idle
+  - connect
+  - active
+  - opensent
+  - openconfirm
+  - established
+srl-isis-adjacency-state:
+  model: srl_nokia-isis
+  path: /network-instance/protocols/isis/instance/interface/adjacency/state
+  type: enumeration
+  enum:
+  - up
+  - down
+  - init
+  - failed
+srl-platform-oper-state:
+  model: srl_nokia-common
+  path: /platform/power-supply/oper-state
+  type: enumeration
+  enum:
+  - up
+  - down
+  - empty
+  - downloading
+  - booting
+  - starting
+  - failed
+  - synchronizing
+  - upgrading
+  - low-power
+  - degraded
+  - warm-reboot
+  - waiting
+srl-cpu-instant:
+  model: srl_nokia-platform-cpu
+  path: /platform/control/cpu/total/instant
+  type: uint8
+srl-memory-physical:
+  model: srl_nokia-platform-memory
+  path: /platform/control/memory/physical
+  type: uint64
+  units: bytes
+srl-memory-reserved:
+  model: srl_nokia-platform-memory
+  path: /platform/control/memory/reserved
+  type: uint64
+  units: bytes
+srl-memory-free:
+  model: srl_nokia-platform-memory
+  path: /platform/control/memory/free
+  type: uint64
+  units: bytes
+srl-memory-utilization:
+  model: srl_nokia-platform-memory
+  path: /platform/control/memory/utilization
+  type: uint8
+srl-disk-size:
+  model: srl_nokia-platform-disk
+  path: /platform/control/disk/partition/size
+  type: uint64
+  units: bytes
+srl-disk-used:
+  model: srl_nokia-platform-disk
+  path: /platform/control/disk/partition/used
+  type: uint64
+  units: bytes
+srl-disk-free:
+  model: srl_nokia-platform-disk
+  path: /platform/control/disk/partition/free
+  type: uint64
+  units: bytes
+srl-disk-percent-used:
+  model: srl_nokia-platform-disk
+  path: /platform/control/disk/partition/percent-used
+  type: uint8
+srl-xcvr-input-power:
+  model: srl_nokia-interfaces
+  path: /interface/transceiver/input-power/latest-value
+  type: decimal64
+srl-xcvr-output-power:
+  model: srl_nokia-interfaces
+  path: /interface/transceiver/output-power/latest-value
+  type: decimal64
+srl-xcvr-laser-bias-current:
+  model: srl_nokia-interfaces
+  path: /interface/transceiver/laser-bias-current/latest-value
+  type: decimal64
+srl-xcvr-temperature:
+  model: srl_nokia-interfaces
+  path: /interface/transceiver/temperature/latest-value
+  type: int16
+  units: celsius
+srl-temperature:
+  model: srl_nokia-platform
+  path: /platform/control[slot=*]/temperature/instant
+  type: int16
+  units: celsius
+srl-fan-speed-percent:
+  model: srl_nokia-platform-fan
+  path: /platform/fan-tray/speed
+  type: uint8

@@ -1,0 +1,2 @@
+exit=0
+leaf1: bgp-peers = forced-off

@@ -1,0 +1,20 @@
+# Arista vendor definition.
+#
+# Stage-1: capabilities advertise organization "Arista" (e.g. "Arista Networks").
+# Stage-2 probe (Subscribe-ONCE) reads the EOS-native image leaves. Validated
+# against a live cEOS node:
+#   eos_native:Eos/image/version = 4.33.4M
+#   eos_native:Eos/image/flavor  = cEOS
+# Hardware model is not exposed on cEOS; on real hardware it would come from
+# /components/component (where type=CHASSIS) part-no.
+vendor: arista
+fingerprint:
+  priority: 100
+  match:
+    org_contains: ["Arista"]
+platform_probe:
+  path: eos_native:/Eos/image
+  encoding: json_ietf  # Arista EOS advertises no PROTO
+  extract:
+    os_version: version
+    os: flavor

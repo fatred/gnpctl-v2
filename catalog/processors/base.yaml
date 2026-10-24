@@ -1,0 +1,14 @@
+# gnpctl processor library — named gnmic-native event-processors, applied on the
+# egress side (consume from NATS → process → Prometheus remote_write). A file is a
+# mapping of processor name → gnmic processor spec; reference names from a module's
+# `processors:` list.
+
+# Minimal/base chain: stamp a pipeline tag so egress-processed series are
+# attributable. Device metadata (vendor/model/variant) already rides as target tags
+# from ingress, so this is intentionally light — real per-module transforms are
+# added in each module's own slice.
+gnpctl-meta:
+  event-add-tag:
+    overwrite: false
+    add:
+      pipeline: gnpctl

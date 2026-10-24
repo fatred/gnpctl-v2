@@ -1,0 +1,9 @@
+{
+  "supported_models": [
+    {"name": "openconfig-interfaces", "organization": "OpenConfig", "version": "2.0.0"},
+    {"name": "openconfig-platform", "organization": "OpenConfig", "version": "0.12.2"},
+    {"name": "arista-intf-augments", "organization": "Arista Networks", "version": "1.0.0"}
+  ],
+  "supported_encodings": ["json_ietf"],
+  "gnmi_version": "0.10.0"
+}
