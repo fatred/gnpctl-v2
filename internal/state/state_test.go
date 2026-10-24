@@ -492,8 +492,8 @@ func TestEmptyInventoryTextIsStoredAsEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if src["credential_ref"] != "" {
-		t.Errorf("credential_ref = %#v, want \"\"", src["credential_ref"])
+	if src["credential_ref"] != nil {
+		t.Errorf("credential_ref = %#v, want NULL", src["credential_ref"])
 	}
 }
 

@@ -172,7 +172,7 @@ func (s *State) AddSource(name, typ string, parameters map[string]any, credentia
 	}
 	_, err = s.db.Exec(
 		"INSERT INTO inventory_sources(name,type,parameters,credential_ref) VALUES(?,?,?,?)",
-		name, typ, string(encoded), credentialRef,
+		name, typ, string(encoded), nullIfEmpty(credentialRef),
 	)
 	// Python catches sqlite3.IntegrityError instead of checking first: the insert
 	// is the atomic duplicate test.

@@ -16,6 +16,8 @@ func newInventoryCmd(app *appContext) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "inventory",
 		Short: "Manage inventory sources and the targets table.",
+		Args:  usageArgs(cobra.NoArgs),
+		RunE:  func(cmd *cobra.Command, _ []string) error { return helpUsage(cmd) },
 	}
 	cmd.AddCommand(
 		newInventoryAddCmd(app),
@@ -34,8 +36,11 @@ func newInventoryAddCmd(app *appContext) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add NAME",
 		Short: "Register an inventory source (like a git remote).",
-		Args:  cobra.ExactArgs(1),
+		Args:  usageArgs(cobra.ExactArgs(1)),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := requireFlag(cmd, "type"); err != nil {
+				return err
+			}
 			parsed := map[string]string{}
 			for _, item := range params {
 				key, value, ok := strings.Cut(item, "=")
@@ -57,7 +62,6 @@ func newInventoryAddCmd(app *appContext) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&typeName, "type", "", "Source type (e.g. nornir, netbox).")
-	_ = cmd.MarkFlagRequired("type")
 	cmd.Flags().StringArrayVarP(&params, "param", "p", nil, "Source parameter as key=value (repeatable).")
 	cmd.Flags().StringVar(&tokenEnv, "token-env", "", "Name of the env var holding the source credential.")
 	return cmd
@@ -67,7 +71,7 @@ func newInventoryRemoveCmd(app *appContext) *cobra.Command {
 	return &cobra.Command{
 		Use:   "remove NAME",
 		Short: "Remove an inventory source (targets are left intact).",
-		Args:  cobra.ExactArgs(1),
+		Args:  usageArgs(cobra.ExactArgs(1)),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			st, err := app.openState()
 			if err != nil {
@@ -91,7 +95,7 @@ func newInventoryListCmd(app *appContext) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List configured inventory sources.",
-		Args:  cobra.NoArgs,
+		Args:  usageArgs(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			st, err := app.openState()
 			if err != nil {
@@ -118,7 +122,7 @@ func newInventoryPullCmd(app *appContext) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "pull",
 		Short: "Sync targets from configured sources into the targets table.",
-		Args:  cobra.NoArgs,
+		Args:  usageArgs(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			st, err := app.openState()
 			if err != nil {
@@ -149,7 +153,7 @@ func newInventoryDiffCmd(app *appContext) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "diff",
 		Short: "Show source-vs-database variance without writing.",
-		Args:  cobra.NoArgs,
+		Args:  usageArgs(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			st, err := app.openState()
 			if err != nil {
@@ -175,7 +179,7 @@ func newInventoryShowCmd(app *appContext) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "show",
 		Short: "Render the targets table (filterable).",
-		Args:  cobra.NoArgs,
+		Args:  usageArgs(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			st, err := app.openState()
 			if err != nil {

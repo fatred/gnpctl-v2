@@ -14,7 +14,7 @@ func newTestCmd(app *appContext) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "test",
 		Short: "Subscribe-ONCE the effective-profile paths and report per-path results.",
-		Args:  cobra.NoArgs,
+		Args:  usageArgs(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			cat, err := app.loadCatalog()
 			if err != nil {
