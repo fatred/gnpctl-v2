@@ -344,8 +344,10 @@ func (s *State) ReconcileModules(target string, defaults map[string]int) error {
 // ----- targets -----
 
 // UpsertTarget inserts a new target or refreshes inventory-owned fields,
-// preserving discovery-owned fields. Port is only overwritten when non-nil.
-func (s *State) UpsertTarget(name, address string, port *int, platformHint, source string) error {
+// preserving discovery-owned fields. Nil address, port and platform_hint store
+// SQL NULL (Python's None); non-nil empty strings stay "". Port is only
+// overwritten when non-nil.
+func (s *State) UpsertTarget(name string, address *string, port *int, platformHint *string, source string) error {
 	existing, err := s.GetTarget(name)
 	if err != nil {
 		return err

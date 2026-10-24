@@ -69,7 +69,7 @@ func discovered(t *testing.T) *state.State {
 		t.Fatalf("state.Open: %v", err)
 	}
 	t.Cleanup(func() { s.Close() })
-	if err := s.UpsertTarget("leaf1", "10.0.0.1", nil, "", ""); err != nil {
+	if err := s.UpsertTarget("leaf1", new("10.0.0.1"), nil, new(""), ""); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.EnrichTarget("leaf1", state.Enrichment{
