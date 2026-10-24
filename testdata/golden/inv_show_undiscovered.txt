@@ -1,0 +1,5 @@
+exit=0
+name    address      port  discovered  vendor  model  os_version  catalog_key  last_error
+------  -----------  ----  ----------  ------  -----  ----------  -----------  ----------
+leaf1   172.20.20.3  -     no          -       -      -           -            -         
+spine1  172.20.20.4  -     no          -       -      -           -            -         

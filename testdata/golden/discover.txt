@@ -1,0 +1,8 @@
+exit=0
+Fingerprinting leaf1
+leaf1 is nokia, getting make/version
+leaf1 is nokia 7220 IXR-D2L v24.10.4-244-g5c0afd1a61
+Fingerprinting spine1
+spine1 is arista, getting make/version
+spine1 is arista 4.33.4M
+matched=2 unknown=0 error=0

@@ -1,0 +1,6 @@
+{
+  "eos_native:/Eos/image": {
+    "eos_native:Eos/image/version": "4.33.4M",
+    "eos_native:Eos/image/flavor": "cEOS"
+  }
+}

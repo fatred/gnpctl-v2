@@ -1,0 +1,225 @@
+# Nokia SR OS variant (7750 SR family, WAN-edge routers) — native /state telemetry.
+#
+# Selection: the nokia-sros vendor unit isolates SR OS at Stage-1 (models_any nokia-state);
+# this single variant covers the SR router families. Probe model e.g. "7750 SR".
+#
+# Subscription paths are verbatim from the production SR OS gnmic ingestor (sros-sub-*),
+# with the VPRN service name WILDCARDED (vprn[service-name=*]) rather than pinned to a
+# deployment-specific WAN_EDGE. CPU/memory/transceivers/BGP/ISIS use native /state; counters
+# pass through. The egress chains are SR-OS-specific renames + reused canonical-name
+# convert/keep stages (catalog/processors/sros.yaml). Authored against nokia 7x50 YANG @
+# 25.10 + the prod ingestor; FOUR-CORNER VALIDATED on prod defra1-az00-ed01 @ 25.10.R1
+# (7750 SR, `make validate` clean): cpu/memory/transceivers/PSU/BGP session-state/ISIS
+# adjacency all present, numeric, in range, labelled. (Laser-bias is uA on SR OS, scaled to
+# mA by sros-xcvr-bias-scale — see catalog/processors/sros.yaml.)
+key: nokia-sros
+vendor: nokia-sros
+platform_match:
+  model: ["7750*", "7250*", "7950*"]
+default_port: 57400
+encoding: proto
+platform_hints: ["nokia_sros", "nokia_sr"]
+
+modules:
+  processors:
+    processors: [sros-cpu-rename, cpu-convert, cpu-keep]
+    metrics:
+      cpu_utilization:
+        type: numeric
+        federate: true
+        yang: sros-cpu-usage
+    paths:
+      - key: cpu
+        path: /state/system/cpu/summary/usage/cpu-usage
+        mode: sample
+        sample_interval: 15s
+        yang: sros-cpu-usage
+        description: "System CPU utilisation (percent)"
+
+  mempools:
+    processors: [sros-memory-rename, memory-convert, memory-keep]
+    metrics:
+      memory_total_bytes:
+        type: numeric
+        federate: true
+        yang: sros-memory-total
+      memory_used_bytes:
+        type: numeric
+        federate: true
+        yang: sros-memory-used
+      memory_free_bytes:
+        type: numeric
+        federate: true
+        yang: sros-memory-available
+    paths:
+      - key: mem
+        path: /state/system/memory-pools/summary
+        mode: sample
+        sample_interval: 15s
+        description: "System memory-pools summary (bytes)"
+
+  transceivers:
+    processors: [sros-transceiver-rename, transceiver-convert, sros-xcvr-bias-scale, transceiver-keep]
+    metrics:
+      transceiver_input_power_dbm:
+        type: numeric
+        federate: true
+        yang: sros-xcvr-input-power
+      transceiver_output_power_dbm:
+        type: numeric
+        federate: true
+        yang: sros-xcvr-output-power
+      transceiver_laser_bias_ma:   # SR OS reports uA; sros-xcvr-bias-scale converts to mA
+        type: numeric
+        federate: true
+        yang: sros-xcvr-laser-bias
+    paths:
+      - key: ddm
+        path: /state/port[port-id=*]/transceiver/digital-diagnostic-monitoring
+        mode: sample
+        sample_interval: 15s
+        description: "Transceiver digital diagnostic monitoring (optical power, bias)"
+
+  sensors:
+    processors: [sros-sensors-state, sensors-keep]
+    metrics:
+      power_supply_state:
+        type: state
+        federate: true
+        optional: true   # PSU oper-state path confirmed at capture (prod monitored temp/fan)
+        yang: sros-hw-oper-state
+        required_labels:
+          - oper_state
+        map:
+          in-service: 1
+          in-service-upgrade: 1
+          in-service-downgrade: 1
+          power-save: 1
+          out-of-service: 0
+          failed: 0
+          diagnosing: 0
+          reset-pending: 0
+          soft-reset: 0
+          unknown: -1
+          booting: -1
+          empty: -1
+          provisioned: -1
+          unprovisioned: -1
+          upgrade: -1
+          downgrade: -1
+          pre-extension: -1
+          downloading: -1
+    paths:
+      - key: psu
+        path: /state/chassis[chassis-class=router][chassis-number=1]/power-supply[power-supply-id=*]/hardware-data/oper-state
+        mode: sample
+        sample_interval: 15s
+        yang: sros-hw-oper-state
+        description: "Power-supply hardware operational state"
+
+  environment:
+    processors: [environment-temp-rename, environment-fan-rename, environment-convert, environment-keep]
+    metrics:
+      temperature_celsius:
+        type: numeric
+        federate: true
+        yang: sros-temperature
+      fan_speed_percent:   # SR OS reports fan speed as a percentage (no rpm)
+        type: numeric
+        federate: true
+        yang: sros-fan-speed-percent
+    paths:
+      - key: card-temp
+        path: /state/card[slot-number=*]/hardware-data/temperature
+        mode: sample
+        sample_interval: 15s
+        description: "Card hardware temperature"
+      - key: mda-temp
+        path: /state/card[slot-number=*]/mda[mda-slot=*]/hardware-data/temperature
+        mode: sample
+        sample_interval: 15s
+        description: "MDA hardware temperature"
+      - key: chassis-temp
+        path: /state/chassis[chassis-class=router][chassis-number=1]/chassis-control-module[ccm-slot=*]/hardware-data/temperature
+        mode: sample
+        sample_interval: 15s
+        description: "CCM hardware temperature"
+      - key: fan-speed
+        path: /state/chassis[chassis-class=router][chassis-number=1]/fan[fan-slot=*]/speed
+        mode: sample
+        sample_interval: 15s
+        description: "Fan speed (percent)"
+
+  ports:
+    processors: [gnpctl-meta]
+    paths:
+      - key: port-oper-state
+        path: /state/port[port-id=*]/oper-state
+        mode: sample
+        sample_interval: 15s
+        description: "Port operational state"
+      - key: port-oper-speed
+        path: /state/port[port-id=*]/ethernet/oper-speed
+        mode: sample
+        sample_interval: 15s
+        description: "Port operational speed"
+      - key: intf-counters
+        path: /interfaces/interface[name=*]/state/counters
+        mode: sample
+        sample_interval: 15s
+        description: "Interface counters (OpenConfig)"
+      - key: router-intf-statistics
+        path: /state/router[router-name=*]/interface[interface-name=*]/statistics
+        mode: sample
+        sample_interval: 15s
+        description: "Router interface statistics"
+      - key: vprn-intf-statistics
+        path: /state/service/vprn[service-name=*]/interface[interface-name=*]/statistics
+        mode: sample
+        sample_interval: 15s
+        description: "VPRN interface statistics"
+
+  bgp-peers:
+    default: on  # BGP runs on the WAN-edge routers
+    processors: [sros-bgp-fsm, bgp-fsm-convert, bgp-rename, bgp-keep-state]
+    metrics:
+      bgp_neighbor_session_state:
+        type: state
+        federate: true
+        yang: sros-bgp-session-state
+        yang_enum: false   # SR OS models session-state as a free-text string, not a YANG enum
+        map:
+          idle: 1
+          connect: 2
+          active: 3
+          opensent: 4
+          openconnect: 5
+          established: 6
+    paths:
+      - key: bgp-statistics
+        path: /state/service/vprn[service-name=*]/bgp/neighbor[ip-address=*]/statistics
+        mode: sample
+        sample_interval: 15s
+        yang: sros-bgp-session-state
+        description: "VPRN BGP neighbor statistics (incl. session-state)"
+
+  isis:
+    processors: [sros-isis-fsm, sros-isis-convert, sros-isis-rename, isis-keep-state]
+    metrics:
+      isis_adjacency_state:
+        type: state
+        federate: true
+        optional: true  # core/wan-only — absent on roles that don't run IS-IS
+        yang: sros-isis-adjacency-oper-state
+        map:
+          up: 3
+          initializing: 2
+          down: 1
+          failed: 0
+    paths:
+      - key: isis-adjacency-oper-state
+        path: /state/service/vprn[service-name=*]/isis[isis-instance=*]/interface[interface-name=*]/adjacency/oper-state
+        mode: sample
+        sample_interval: 15s
+        yang: sros-isis-adjacency-oper-state
+        description: "VPRN IS-IS adjacency operational state"

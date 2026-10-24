@@ -1,0 +1,10 @@
+{
+  "supported_models": [
+    {"name": "nokia-conf", "organization": "Nokia", "version": "25.10.R1"},
+    {"name": "nokia-state", "organization": "Nokia", "version": "25.10.R1"},
+    {"name": "nokia-sr-openconfig-system-deviations", "organization": "Nokia", "version": "25.10.R1"},
+    {"name": "openconfig-system", "organization": "OpenConfig working group", "version": "0.10.1"}
+  ],
+  "supported_encodings": ["json_ietf", "proto"],
+  "gnmi_version": "0.8.0"
+}

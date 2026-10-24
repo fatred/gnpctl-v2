@@ -1,0 +1,75 @@
+# Memory (egress, gnmic 0.46). Normalize per-vendor memory leaves to common metrics:
+#   memory_total_bytes / memory_used_bytes / memory_free_bytes /
+#   memory_reserved_bytes / memory_utilization (percent)
+#   labels: path keys gnmic emits as tags (slot on SRL, component on Junos).
+#
+# Verified leaves:
+#   nokia-srlinux : /platform/control/memory/{physical,free,reserved,utilization}
+#       (srl_nokia-platform-memory.yang v24.10: physical/reserved/free = uint64 bytes; utilization = percentage)
+#   juniper-mx    : /components/component/state/memory/{available,utilized}   (OpenConfig: available=total, utilized=used)
+#   juniper-qfx   : /system/memory/state/{physical,reserved,...}              (OpenConfig)
+#
+# Vendors emit only the subset they expose, under the shared names; derive the rest
+# in PromQL (e.g. used = total - free where a vendor lacks a `used` leaf). Validated on
+# prod Juniper too (defra1, QFX5k/QFX10k @ 23.4R2; OC `available` = total).
+#
+# Validated on live SRL (clab, gnmic 0.46): memory_total_bytes / memory_free_bytes /
+# memory_reserved_bytes / memory_utilization, control_slot tag. SRL emits these as
+# JSON strings, so memory-convert (-> float; Prometheus is float64) is required.
+
+# Map each recognised memory leaf to its common metric name (mutually-exclusive
+# suffixes, so order doesn't matter).
+memory-rename:
+  event-strings:
+    value-names:
+      - ".*memory.*"
+    transforms:
+      - replace:
+          apply-on: name
+          old: ".*memory.*/physical$"
+          new: memory_total_bytes
+      - replace:
+          apply-on: name
+          old: ".*memory.*/available$"
+          new: memory_total_bytes
+      - replace:
+          apply-on: name
+          old: ".*memory.*/utilized$"
+          new: memory_used_bytes
+      - replace:
+          apply-on: name
+          old: ".*memory.*/used$"
+          new: memory_used_bytes
+      - replace:
+          apply-on: name
+          old: ".*memory.*/free$"
+          new: memory_free_bytes
+      - replace:
+          apply-on: name
+          old: ".*memory.*/reserved$"
+          new: memory_reserved_bytes
+      - replace:
+          apply-on: name
+          old: ".*memory.*/utilization$"
+          new: memory_utilization
+
+# SRL emits uint64/percentage as JSON strings; coerce to numeric for Prometheus.
+memory-convert:
+  event-convert:
+    value-names:
+      - "^memory_total_bytes$"
+      - "^memory_used_bytes$"
+      - "^memory_free_bytes$"
+      - "^memory_reserved_bytes$"
+      - "^memory_utilization$"
+    type: float
+
+# Keep only the common metrics; drop any other leaves under the memory subtree.
+memory-keep:
+  event-allow:
+    value-names:
+      - "^memory_total_bytes$"
+      - "^memory_used_bytes$"
+      - "^memory_free_bytes$"
+      - "^memory_reserved_bytes$"
+      - "^memory_utilization$"

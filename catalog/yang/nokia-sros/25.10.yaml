@@ -1,0 +1,90 @@
+sros-bgp-session-state:
+  model: nokia-state-router-bgp
+  path: /state/service/vprn/bgp/neighbor/statistics/session-state
+  type: string
+sros-port-oper-state:
+  model: nokia-types-port
+  path: /state/port/oper-state
+  type: enumeration
+  enum:
+  - unknown
+  - up
+  - down
+  - diagnosing
+  - failed
+sros-hw-oper-state:
+  model: nokia-types-chassis
+  path: /state/chassis/power-supply/oper-state
+  type: enumeration
+  enum:
+  - unknown
+  - in-service
+  - out-of-service
+  - diagnosing
+  - failed
+  - booting
+  - empty
+  - provisioned
+  - unprovisioned
+  - upgrade
+  - downgrade
+  - in-service-upgrade
+  - in-service-downgrade
+  - reset-pending
+  - soft-reset
+  - pre-extension
+  - downloading
+  - power-save
+sros-cpu-usage:
+  model: nokia-state-system
+  path: /state/system/cpu/summary/usage/cpu-usage
+  type: decimal64
+  units: percent
+sros-memory-total:
+  model: nokia-state-system
+  path: /state/system/memory-pools/summary/current-total-size
+  type: uint64
+  units: bytes
+sros-memory-used:
+  model: nokia-state-system
+  path: /state/system/memory-pools/summary/total-in-use
+  type: uint64
+  units: bytes
+sros-memory-available:
+  model: nokia-state-system
+  path: /state/system/memory-pools/summary/available-memory
+  type: uint64
+  units: bytes
+sros-xcvr-input-power:
+  model: nokia-state-port
+  path: /state/port/transceiver/digital-diagnostic-monitoring/received-optical-power/current
+  type: decimal64
+  units: decibel-milliwatts
+sros-xcvr-output-power:
+  model: nokia-state-port
+  path: /state/port/transceiver/digital-diagnostic-monitoring/transmit-output-power/current
+  type: decimal64
+  units: decibel-milliwatts
+sros-xcvr-laser-bias:
+  model: nokia-state-port
+  path: /state/port/transceiver/digital-diagnostic-monitoring/transmit-bias-current/current
+  type: decimal64
+  units: microamperes
+sros-isis-adjacency-oper-state:
+  model: nokia-state-svc-vprn-isis
+  path: /state/service/vprn/isis/interface/adjacency/oper-state
+  type: enumeration
+  enum:
+  - initializing
+  - up
+  - failed
+  - down
+sros-temperature:
+  model: nokia-state-chassis
+  path: /state/chassis/hardware-data/temperature
+  type: int32
+sros-fan-speed-percent:
+  model: nokia-state-chassis
+  path: /state/chassis/fan/speed
+  type: uint32
+  units: percent

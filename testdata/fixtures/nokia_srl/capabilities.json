@@ -1,0 +1,9 @@
+{
+  "supported_models": [
+    {"name": "srl_nokia-system", "organization": "Nokia", "version": "2023-10-31"},
+    {"name": "srl_nokia-interfaces", "organization": "Nokia", "version": "2023-10-31"},
+    {"name": "openconfig-interfaces", "organization": "OpenConfig", "version": "2.0.0"}
+  ],
+  "supported_encodings": ["json_ietf", "proto"],
+  "gnmi_version": "0.10.0"
+}

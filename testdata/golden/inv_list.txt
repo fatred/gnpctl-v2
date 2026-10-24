@@ -1,0 +1,2 @@
+exit=0
+clab	nornir	last_poll=1792842827	

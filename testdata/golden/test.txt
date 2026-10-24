@@ -1,0 +1,23 @@
+exit=0
+leaf1 /platform/control[slot=*]/cpu[index=*]/total/instant: ok
+leaf1 /platform/control[slot=*]/memory: ok
+leaf1 /platform/control[slot=*]/disk[name=*]/partition[name=*]: ok
+leaf1 /platform/power-supply[id=*]/oper-state: ok
+leaf1 /system/event-handler/instance[name=*]/oper-state: ok
+leaf1 /platform/control[slot=*]/temperature/instant: ok
+leaf1 /platform/fan-tray[id=*]/speed: ok
+leaf1 /interface[name=*]/admin-state: ok
+leaf1 /interface/description: ok
+leaf1 /interface[name=*]/oper-state: ok
+leaf1 /interface[name=*]/ethernet/port-speed: ok
+leaf1 /interface[name=*]/last-change: ok
+leaf1 /interface[name=*]/statistics: ok
+leaf1 /interface[name=*]/subinterface[index=*]/statistics: ok
+leaf1 /interface[name=*]/transceiver/channel[index=*]/input-power: ok
+leaf1 /interface[name=*]/transceiver/channel[index=*]/output-power: ok
+leaf1 /interface[name=*]/transceiver/channel[index=*]/laser-bias-current/latest-value: ok
+leaf1 /interface[name=*]/transceiver/input-power: ok
+leaf1 /interface[name=*]/transceiver/output-power: ok
+leaf1 /interface[name=*]/transceiver/laser-bias-current/latest-value: ok
+leaf1 /interface[name=*]/transceiver/temperature/latest-value: ok
+spine1 /interfaces/interface/state/counters: ok

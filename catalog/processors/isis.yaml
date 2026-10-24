@@ -1,0 +1,62 @@
+# IS-IS normalization chain (egress, gnmic 0.46). Normalizes nokia-native and
+# juniper-OpenConfig IS-IS adjacency state into a common Prometheus schema:
+#   isis_adjacency_state  gauge  UP=3 / INIT=2 / DOWN=1 / FAILED=0  (alert < 3)
+#   labels: the path keys gnmic emits as tags (interface, system-id, level,
+#           network-instance) — no string metadata to promote, so no info series.
+#
+# Verified against srl_nokia-isis.yang (v24.10): the SRL adjacency state leaf is
+# `state` (typedef isis-interface-adj-state, enum up/down/init/failed), so its value
+# key ends in `.../adjacency/state` — whereas Junos OpenConfig ends in
+# `.../adjacency-state`. The regex `.*adjacency[-/]state$` matches both. Same shape
+# as the validated bgp chain (uppercase + suffix-regex, event-allow prune).
+# Validated on live SRL (clab, gnmic 0.46): wan L2 adjacency -> isis_adjacency_state=3
+# (up), with level/system-id/interface/instance as labels, subtree pruned.
+
+# adjacency state enum -> numeric (uppercase first so SRL/Junos both map).
+isis-fsm:
+  event-strings:
+    value-names:
+      - ".*adjacency[-/]state$"
+    transforms:
+      - to-upper:
+          apply-on: value
+      - replace:
+          apply-on: value
+          old: "^FAILED$"
+          new: "0"
+      - replace:
+          apply-on: value
+          old: "^DOWN$"
+          new: "1"
+      - replace:
+          apply-on: value
+          old: "^INIT$"
+          new: "2"
+      - replace:
+          apply-on: value
+          old: "^UP$"
+          new: "3"
+
+isis-fsm-convert:
+  event-convert:
+    value-names:
+      - ".*adjacency[-/]state$"
+    type: int
+
+# Rename the adjacency state value key to the common metric name.
+isis-rename:
+  event-strings:
+    value-names:
+      - ".*adjacency[-/]state$"
+    transforms:
+      - replace:
+          apply-on: name
+          old: ".*adjacency[-/]state$"
+          new: isis_adjacency_state
+
+# gnmic emits one event per leaf; keep only the exported metric (drop the rest of
+# the adjacency subtree / the up-timestamp leaf). Runs last, after the rename.
+isis-keep-state:
+  event-allow:
+    value-names:
+      - "^isis_adjacency_state$"

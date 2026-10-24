@@ -1,0 +1,5 @@
+exit=0
+name    address      port   discovered  vendor  model         os_version                catalog_key    last_error
+------  -----------  -----  ----------  ------  ------------  ------------------------  -------------  ----------
+leaf1   172.20.20.3  57400  yes         nokia   7220 IXR-D2L  v24.10.4-244-g5c0afd1a61  nokia-srlinux  -         
+spine1  172.20.20.4  6030   yes         arista  -             4.33.4M                   arista-eos     -         
