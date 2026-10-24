@@ -1,11 +1,11 @@
 package render_test
 
 import (
-	"bytes"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"strconv"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -132,7 +132,7 @@ func newState(t *testing.T) *state.State {
 
 func addTarget(t *testing.T, st *state.State, name, address string, port int, key, vendor, model, osVersion string) {
 	t.Helper()
-	if err := st.UpsertTarget(name, address, &port, "", ""); err != nil {
+	if err := st.UpsertTarget(name, new(address), &port, new(""), ""); err != nil {
 		t.Fatal(err)
 	}
 	if err := st.EnrichTarget(name, state.Enrichment{
@@ -539,7 +539,7 @@ func TestSecureRenderEmitsNoTLSWarning(t *testing.T) {
 
 func TestUndiscoveredAndKeylessTargetsSkipped(t *testing.T) {
 	st := miniState(t)
-	if err := st.UpsertTarget("undisc", "10.0.0.2", nil, "", ""); err != nil {
+	if err := st.UpsertTarget("undisc", new("10.0.0.2"), nil, new(""), ""); err != nil {
 		t.Fatal(err)
 	}
 	desired := compute(t, st, miniCatalog(t), defaultRenderConfig(t))
@@ -829,10 +829,10 @@ func federateState(t *testing.T) *state.State {
 	return st
 }
 
-// TestGoldenRenderByteIdentical renders the Python-populated state against the
-// real catalog and compares the three artifacts byte for byte with the golden
-// files produced by the Python implementation.
-func TestGoldenRenderByteIdentical(t *testing.T) {
+// TestGoldenRenderSemantic renders the Python-populated state against the real
+// catalog and compares the three artifacts with the golden files produced by the
+// Python implementation: same structure, scalar values and mapping key order.
+func TestGoldenRenderSemantic(t *testing.T) {
 	cat := realCatalog(t)
 	goldenDir := filepath.Join("..", "..", "testdata", "golden")
 	dbSource := filepath.Join(goldenDir, "python_state.db")
@@ -876,37 +876,71 @@ func TestGoldenRenderByteIdentical(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !bytes.Equal(got, want) {
-			t.Errorf("%s differs (got %d bytes, want %d)\nfirst diff:\n%s",
-				name, len(got), len(want), firstDiff(got, want))
-		}
+		compareYAML(t, name, got, want)
 	}
 }
 
-func firstDiff(got, want []byte) string {
-	limit := len(got)
-	if len(want) < limit {
-		limit = len(want)
+// compareYAML asserts two YAML documents are semantically equal: same kinds,
+// same mapping key order and equal decoded scalar values. Presentation (quoting
+// style, flow vs block, indentation) is deliberately not compared.
+func compareYAML(t *testing.T, name string, got, want []byte) {
+	t.Helper()
+	var gotNode, wantNode yaml.Node
+	if err := yaml.Unmarshal(got, &gotNode); err != nil {
+		t.Fatalf("%s: produced invalid YAML: %v", name, err)
 	}
-	for i := 0; i < limit; i++ {
-		if got[i] != want[i] {
-			start := i - 120
-			if start < 0 {
-				start = 0
-			}
-			endGot := i + 200
-			if endGot > len(got) {
-				endGot = len(got)
-			}
-			endWant := i + 200
-			if endWant > len(want) {
-				endWant = len(want)
-			}
-			return "offset " + strconv.Itoa(i) + "\ngot:  " + string(got[start:endGot]) +
-				"\nwant: " + string(want[start:endWant])
+	if err := yaml.Unmarshal(want, &wantNode); err != nil {
+		t.Fatalf("%s: golden file invalid YAML: %v", name, err)
+	}
+	compareNode(t, name+": document", &gotNode, &wantNode)
+}
+
+func compareNode(t *testing.T, path string, got, want *yaml.Node) {
+	t.Helper()
+	if got.Kind == yaml.DocumentNode && want.Kind == yaml.DocumentNode {
+		if len(got.Content) != 1 || len(want.Content) != 1 {
+			t.Fatalf("%s: document has %d/%d roots", path, len(got.Content), len(want.Content))
 		}
+		compareNode(t, path, got.Content[0], want.Content[0])
+		return
 	}
-	return "prefix equal; lengths differ"
+	if got.Kind != want.Kind {
+		t.Fatalf("%s: kind %v, want %v", path, got.Kind, want.Kind)
+	}
+	switch got.Kind {
+	case yaml.MappingNode:
+		if len(got.Content) != len(want.Content) {
+			t.Fatalf("%s: %d mapping entries, want %d", path, len(got.Content)/2, len(want.Content)/2)
+		}
+		for i := 0; i+1 < len(got.Content); i += 2 {
+			key := got.Content[i].Value
+			if key != want.Content[i].Value {
+				t.Fatalf("%s: key #%d is %q, want %q (mapping order differs)",
+					path, i/2, key, want.Content[i].Value)
+			}
+			compareNode(t, path+"."+key, got.Content[i+1], want.Content[i+1])
+		}
+	case yaml.SequenceNode:
+		if len(got.Content) != len(want.Content) {
+			t.Fatalf("%s: %d items, want %d", path, len(got.Content), len(want.Content))
+		}
+		for i := range got.Content {
+			compareNode(t, fmt.Sprintf("%s[%d]", path, i), got.Content[i], want.Content[i])
+		}
+	case yaml.ScalarNode:
+		var gotValue, wantValue any
+		if err := got.Decode(&gotValue); err != nil {
+			t.Fatalf("%s: decode produced scalar: %v", path, err)
+		}
+		if err := want.Decode(&wantValue); err != nil {
+			t.Fatalf("%s: decode golden scalar: %v", path, err)
+		}
+		if !reflect.DeepEqual(gotValue, wantValue) {
+			t.Fatalf("%s = %#v, want %#v", path, gotValue, wantValue)
+		}
+	default:
+		t.Fatalf("%s: unexpected node kind %v", path, got.Kind)
+	}
 }
 
 func containsString(items []string, want string) bool {

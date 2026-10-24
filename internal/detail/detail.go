@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/fatred/gnpctl-v2/internal/catalog"
@@ -64,8 +65,8 @@ func Resolve(t transport.GnmiTransport, vendor *catalog.VendorDef) (*Identity, e
 	}
 	elements := group(updates)
 
-	for name, locator := range probe.Extract {
-		value := locate(elements, locator)
+	for _, name := range sortedKeys(probe.Extract) {
+		value := locate(elements, probe.Extract[name])
 		if value == nil {
 			slog.Warn(fmt.Sprintf("probe %s: could not extract '%s'", probe.Path, name))
 			continue
@@ -146,8 +147,8 @@ func group(updates []transport.LeafUpdate) []*elementGroup {
 			elements = append(elements, element)
 		}
 		if blob, ok := update.Value.(map[string]any); ok {
-			for key, value := range blob {
-				element.leaves[leafName(key)] = value
+			for _, key := range sortedKeys(blob) {
+				element.leaves[leafName(key)] = blob[key]
 			}
 		} else {
 			element.leaves[leafName(update.Path)] = update.Value
@@ -189,6 +190,17 @@ func locate(elements []*elementGroup, locator catalog.Locator) any {
 		return nil
 	}
 	return leaves[leafName(locator.Leaf)]
+}
+
+// sortedKeys orders map iteration so extraction warnings and duplicate
+// leaf-name collisions are deterministic; the last sorted key wins.
+func sortedKeys[V any](values map[string]V) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 // pyString mirrors Python's str() for the scalar values probes compare and

@@ -65,7 +65,7 @@ func TestAddListRemoveSource(t *testing.T) {
 	if got := sourceNames(t, s); len(got) != 1 || got[0] != "clab" {
 		t.Fatalf("sources = %v", got)
 	}
-	if err := s.UpsertTarget("leaf1", "10.0.0.1", nil, "", ""); err != nil {
+	if err := s.UpsertTarget("leaf1", new("10.0.0.1"), nil, new(""), ""); err != nil {
 		t.Fatalf("UpsertTarget: %v", err)
 	}
 	removed, err := s.RemoveSource("clab")
@@ -149,6 +149,24 @@ func TestPullInsertsWithDefaults(t *testing.T) {
 	}
 	if src["last_poll"] != int64(500) || src["last_error"] != nil {
 		t.Fatalf("source poll = %v/%v", src["last_poll"], src["last_error"])
+	}
+}
+
+func TestPullStoresNullForAddresslessTarget(t *testing.T) {
+	s := newInventoryState(t)
+	addNornirSource(t, s, "leaf1:\n  platform: nokia_srl\n", "clab")
+	if _, err := Pull(s, nil, new(int64(500))); err != nil {
+		t.Fatalf("Pull: %v", err)
+	}
+	target, err := s.GetTarget("leaf1")
+	if err != nil || target == nil {
+		t.Fatalf("GetTarget = %v, %v", target, err)
+	}
+	if target["address"] != nil {
+		t.Fatalf("address = %#v, want NULL", target["address"])
+	}
+	if target["platform_hint"] != "nokia_srl" {
+		t.Fatalf("platform_hint = %#v", target["platform_hint"])
 	}
 }
 

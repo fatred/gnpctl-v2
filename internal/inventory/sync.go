@@ -56,7 +56,7 @@ func pullSource(st *state.State, row map[string]any, name string) (int, error) {
 	}
 	for _, target := range targets {
 		if err := st.UpsertTarget(
-			target.Name, deref(target.Address), target.Port, deref(target.PlatformHint), name,
+			target.Name, target.Address, target.Port, target.PlatformHint, name,
 		); err != nil {
 			return 0, err
 		}
@@ -84,11 +84,4 @@ func selectedSources(st *state.State, names []string) ([]map[string]any, error) 
 		}
 	}
 	return filtered, nil
-}
-
-func deref(value *string) string {
-	if value == nil {
-		return ""
-	}
-	return *value
 }

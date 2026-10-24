@@ -118,7 +118,7 @@ func TestMatchedTargetEnriched(t *testing.T) {
 	cat := testCatalog(t)
 	s := openTestState(t)
 	port := 57400
-	if err := s.UpsertTarget("leaf1", "10.0.0.1", &port, "nokia_srl", ""); err != nil {
+	if err := s.UpsertTarget("leaf1", new("10.0.0.1"), &port, new("nokia_srl"), ""); err != nil {
 		t.Fatal(err)
 	}
 	tr := transport.NewFixtureTransport(nokiaCaps, nokiaSubs)
@@ -157,7 +157,7 @@ func TestUnknownTargetMarkedDiscoveredNullKey(t *testing.T) {
 	cat := testCatalog(t)
 	s := openTestState(t)
 	port := 57400
-	if err := s.UpsertTarget("mystery", "10.0.0.9", &port, "", ""); err != nil {
+	if err := s.UpsertTarget("mystery", new("10.0.0.9"), &port, new(""), ""); err != nil {
 		t.Fatal(err)
 	}
 	tr := transport.NewFixtureTransport(map[string]any{
@@ -187,7 +187,7 @@ func TestUnreachableTargetRecordsError(t *testing.T) {
 	cat := testCatalog(t)
 	s := openTestState(t)
 	port := 57400
-	if err := s.UpsertTarget("dead", "10.0.0.254", &port, "", ""); err != nil {
+	if err := s.UpsertTarget("dead", new("10.0.0.254"), &port, new(""), ""); err != nil {
 		t.Fatal(err)
 	}
 	boom := func(map[string]any, int) (transport.GnmiTransport, error) {
@@ -226,7 +226,7 @@ func TestPortResolutionExplicitVendorDefaultGlobal(t *testing.T) {
 func TestPortPersistedFromVendorDefault(t *testing.T) {
 	cat := testCatalog(t)
 	s := openTestState(t)
-	if err := s.UpsertTarget("spine1", "10.0.0.5", nil, "arista_eos", ""); err != nil {
+	if err := s.UpsertTarget("spine1", new("10.0.0.5"), nil, new("arista_eos"), ""); err != nil {
 		t.Fatal(err)
 	}
 	var captured []connection
@@ -246,7 +246,7 @@ func TestDiscoveryReconcilesModuleColumns(t *testing.T) {
 	cat := testCatalog(t)
 	s := openTestState(t)
 	port := 57400
-	if err := s.UpsertTarget("leaf1", "10.0.0.1", &port, "nokia_srl", ""); err != nil {
+	if err := s.UpsertTarget("leaf1", new("10.0.0.1"), &port, new("nokia_srl"), ""); err != nil {
 		t.Fatal(err)
 	}
 	tr := transport.NewFixtureTransport(nokiaCaps, nokiaSubs)
@@ -279,7 +279,7 @@ func TestRunDiscoveryCounts(t *testing.T) {
 	s := openTestState(t)
 	port := 57400
 	for _, name := range []string{"leaf1", "leaf2"} {
-		if err := s.UpsertTarget(name, "1", &port, "nokia_srl", ""); err != nil {
+		if err := s.UpsertTarget(name, new("1"), &port, new("nokia_srl"), ""); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -307,7 +307,7 @@ func TestRunDiscoveryContinuesAfterTargetError(t *testing.T) {
 	s := openTestState(t)
 	port := 57400
 	for _, name := range []string{"dead", "leaf1"} {
-		if err := s.UpsertTarget(name, "1", &port, "nokia_srl", ""); err != nil {
+		if err := s.UpsertTarget(name, new("1"), &port, new("nokia_srl"), ""); err != nil {
 			t.Fatal(err)
 		}
 	}
