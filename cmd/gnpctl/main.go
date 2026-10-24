@@ -1,5 +1,5 @@
 package main
 
-import "fmt"
+import "os"
 
-func main() { fmt.Println("gnpctl (go port) - not yet wired") }
+func main() { os.Exit(run(os.Args[1:], os.Stdout, os.Stderr)) }
