@@ -25,20 +25,14 @@ import (
 type TransportFactory func(target map[string]any, port int) (transport.GnmiTransport, error)
 
 // DefaultTransportFactory builds a live transport, sourcing gNMI credentials
-// from the target, else the environment. Secrets stay in the environment: the
-// device account is TARGET_USER / TARGET_PASS; GNMI_TLS_CA is the CA bundle
-// used instead of disabling verification.
+// from the environment. Secrets stay there: the device account is TARGET_USER /
+// TARGET_PASS; GNMI_TLS_CA is the CA bundle used instead of disabling
+// verification.
 var DefaultTransportFactory TransportFactory = liveTransport
 
 func liveTransport(target map[string]any, port int) (transport.GnmiTransport, error) {
-	username := stringField(target, "username")
-	if username == "" {
-		username = os.Getenv("TARGET_USER")
-	}
-	password := stringField(target, "password")
-	if password == "" {
-		password = os.Getenv("TARGET_PASS")
-	}
+	username := os.Getenv("TARGET_USER")
+	password := os.Getenv("TARGET_PASS")
 	if username == "" || password == "" {
 		return nil, errors.New("gNMI credentials not set — export TARGET_USER and TARGET_PASS (the device account gnpctl connects with)")
 	}
@@ -69,11 +63,7 @@ const (
 
 // DiscoverOutcome is one target's discovery result.
 type DiscoverOutcome struct {
-	Name       string
-	Status     string
-	CatalogKey string
-	Port       int
-	Error      string
+	Status string
 }
 
 // DiscoverTarget discovers one target. Transport/probe errors are recorded on
@@ -87,9 +77,6 @@ func DiscoverTarget(
 	now *int64,
 	report io.Writer,
 ) (DiscoverOutcome, error) {
-	if factory == nil {
-		factory = DefaultTransportFactory
-	}
 	name := stringField(target, "name")
 	timestamp := time.Now().Unix()
 	if now != nil {
@@ -97,21 +84,21 @@ func DiscoverTarget(
 	}
 	port := ResolvePort(target, cat)
 	if err := st.SetTargetPort(name, port); err != nil {
-		return DiscoverOutcome{Name: name, Status: StatusError, Port: port}, err
+		return DiscoverOutcome{Status: StatusError}, err
 	}
 	if err := st.EnsureModuleColumns(cat.Modules().Names()); err != nil {
-		return DiscoverOutcome{Name: name, Status: StatusError, Port: port}, err
+		return DiscoverOutcome{Status: StatusError}, err
 	}
 	say(report, fmt.Sprintf("Fingerprinting %s", name))
 
 	fail := func(phase string, cause error) (DiscoverOutcome, error) {
 		message := describe(cause)
-		slog.Warn(fmt.Sprintf("discover %s: %s error: %s", name, phase, message), "error", cause)
+		slog.Warn(fmt.Sprintf("discover %s: %s error: %s", name, phase, message))
 		if err := st.RecordTargetError(name, errors.New(message)); err != nil {
-			return DiscoverOutcome{Name: name, Status: StatusError, Port: port}, err
+			return DiscoverOutcome{Status: StatusError}, err
 		}
 		say(report, fmt.Sprintf("%s: error: %s", name, message))
-		return DiscoverOutcome{Name: name, Status: StatusError, Port: port, Error: message}, nil
+		return DiscoverOutcome{Status: StatusError}, nil
 	}
 
 	gnmi, err := factory(target, port)
@@ -139,13 +126,13 @@ func DiscoverTarget(
 			CapabilitiesHash: profile.Hash(),
 			Port:             &port,
 		}); err != nil {
-			return DiscoverOutcome{Name: name, Status: StatusUnknown, Port: port}, err
+			return DiscoverOutcome{Status: StatusUnknown}, err
 		}
 		if err := st.ReconcileModules(name, moduleDefaults(cat, nil)); err != nil {
-			return DiscoverOutcome{Name: name, Status: StatusUnknown, Port: port}, err
+			return DiscoverOutcome{Status: StatusUnknown}, err
 		}
 		say(report, fmt.Sprintf("%s: vendor not recognised", name))
-		return DiscoverOutcome{Name: name, Status: StatusUnknown, Port: port}, nil
+		return DiscoverOutcome{Status: StatusUnknown}, nil
 	}
 
 	say(report, fmt.Sprintf("%s is %s, getting make/version", name, vendorMatch.Vendor))
@@ -183,7 +170,7 @@ func DiscoverTarget(
 		CapabilitiesHash: profile.Hash(),
 		Port:             &port,
 	}); err != nil {
-		return DiscoverOutcome{Name: name, Status: StatusError, Port: port}, err
+		return DiscoverOutcome{Status: StatusError}, err
 	}
 
 	var effective *catalog.EffectiveProfile
@@ -194,20 +181,20 @@ func DiscoverTarget(
 		}
 		effective, err = cat.EffectiveProfile(variant.Key, versionPtr)
 		if err != nil {
-			return DiscoverOutcome{Name: name, Status: StatusError, Port: port}, err
+			return DiscoverOutcome{Status: StatusError}, err
 		}
 	}
 	if err := st.ReconcileModules(name, moduleDefaults(cat, effective)); err != nil {
-		return DiscoverOutcome{Name: name, Status: StatusError, Port: port}, err
+		return DiscoverOutcome{Status: StatusError}, err
 	}
 
 	descr := joinNonEmpty(identity.Vendor, text(identity.Model), osVersion)
 	if variant == nil {
 		say(report, fmt.Sprintf("%s is %s (no catalog variant)", name, descr))
-		return DiscoverOutcome{Name: name, Status: StatusUnknown, Port: port}, nil
+		return DiscoverOutcome{Status: StatusUnknown}, nil
 	}
 	say(report, fmt.Sprintf("%s is %s", name, descr))
-	return DiscoverOutcome{Name: name, Status: StatusMatched, CatalogKey: variant.Key, Port: port}, nil
+	return DiscoverOutcome{Status: StatusMatched}, nil
 }
 
 // describe is a non-empty error string — some transport/gRPC errors stringify

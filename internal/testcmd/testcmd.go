@@ -37,9 +37,6 @@ func RunTest(
 	target *string,
 	factory pipeline.TransportFactory,
 ) ([]TargetTestResult, bool, error) {
-	if factory == nil {
-		factory = pipeline.DefaultTransportFactory
-	}
 	names := cat.Modules().Names()
 	if err := st.EnsureModuleColumns(names); err != nil {
 		return nil, false, err

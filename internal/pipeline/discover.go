@@ -21,12 +21,6 @@ func RunDiscovery(
 	now *int64,
 	report io.Writer,
 ) (map[string]int, error) {
-	if mode == "" {
-		mode = "default"
-	}
-	if factory == nil {
-		factory = DefaultTransportFactory
-	}
 	targets, err := st.SelectTargets(mode, window, target, now)
 	if err != nil {
 		return nil, err

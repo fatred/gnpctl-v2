@@ -329,11 +329,11 @@ func collectSlices(
 		sort.Strings(targetSubs)
 		tags := Ordered{}
 		// Python's row.get() yields None for an absent column and emit drops
-		// None tags; Go stores text columns as "", so drop those here.
-		if vendor, ok := row["vendor"].(string); ok && vendor != "" {
+		// only None tags; an empty string is a value it keeps.
+		if vendor, ok := row["vendor"].(string); ok {
 			tags.Set("vendor", vendor)
 		}
-		if model, ok := row["model"].(string); ok && model != "" {
+		if model, ok := row["model"].(string); ok {
 			tags.Set("model", model)
 		}
 		tags.Set("variant", key)
