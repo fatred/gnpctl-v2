@@ -11,5 +11,5 @@ Detailed steps, files, interfaces and tests: `docs/plans/2026-10-24-port-to-go.m
 - [x] 9. inventory sync/diff/show
 - [x] 10. pipeline, discover, test
 - [x] 11. render + emit
-- [ ] 12. CLI + e2e
+- [x] 12. CLI + e2e
 - [ ] 13. README, CI, whole-branch Opus review, PR
