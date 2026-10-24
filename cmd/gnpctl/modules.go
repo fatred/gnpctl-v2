@@ -12,6 +12,8 @@ func newModulesCmd(app *appContext) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "modules",
 		Short: "Per-device module enablement (enable / disable / reset / show).",
+		Args:  usageArgs(cobra.NoArgs),
+		RunE:  func(cmd *cobra.Command, _ []string) error { return helpUsage(cmd) },
 	}
 	cmd.AddCommand(
 		newModulesSetCmd(app, "enable", "Force a module on for a target (force-on)."),
@@ -29,8 +31,11 @@ func newModulesSetCmd(app *appContext, action, short string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   action + " MODULE",
 		Short: short,
-		Args:  cobra.ExactArgs(1),
+		Args:  usageArgs(cobra.ExactArgs(1)),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := requireFlag(cmd, "target"); err != nil {
+				return err
+			}
 			module := args[0]
 			cat, err := app.loadCatalog()
 			if err != nil {
@@ -60,8 +65,11 @@ func newModulesSetCmd(app *appContext, action, short string) *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&target, "target", "", "Target to force the module on.")
-	_ = cmd.MarkFlagRequired("target")
+	objective := "on"
+	if action == "disable" {
+		objective = "off"
+	}
+	cmd.Flags().StringVar(&target, "target", "", "Target to force the module "+objective+".")
 	return cmd
 }
 
@@ -70,8 +78,11 @@ func newModulesResetCmd(app *appContext) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "reset MODULE",
 		Short: "Clear an operator pin, returning the module to its discovered default.",
-		Args:  cobra.ExactArgs(1),
+		Args:  usageArgs(cobra.ExactArgs(1)),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := requireFlag(cmd, "target"); err != nil {
+				return err
+			}
 			module := args[0]
 			cat, err := app.loadCatalog()
 			if err != nil {
@@ -95,7 +106,6 @@ func newModulesResetCmd(app *appContext) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&target, "target", "", "Target to reset the module on.")
-	_ = cmd.MarkFlagRequired("target")
 	return cmd
 }
 
@@ -104,7 +114,7 @@ func newModulesShowCmd(app *appContext) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "show",
 		Short: "Show per-target module state (off / on / forced-off / forced-on).",
-		Args:  cobra.NoArgs,
+		Args:  usageArgs(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			cat, err := app.loadCatalog()
 			if err != nil {

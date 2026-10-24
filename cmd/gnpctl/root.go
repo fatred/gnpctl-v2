@@ -63,15 +63,53 @@ type exitError struct{ code int }
 
 func (e *exitError) Error() string { return fmt.Sprintf("exit %d", e.code) }
 
+// usageError is a command-line usage mistake; click exits 2 for these. msg is
+// what follows "Error: ", or empty when the command already printed its help.
+type usageError struct{ msg string }
+
+func (e *usageError) Error() string { return e.msg }
+
+// usageArgs marks positional-argument errors as usage errors.
+func usageArgs(validate cobra.PositionalArgs) cobra.PositionalArgs {
+	return func(cmd *cobra.Command, args []string) error {
+		if err := validate(cmd, args); err != nil {
+			return &usageError{msg: err.Error()}
+		}
+		return nil
+	}
+}
+
+// requireFlag reports a missing required option as a usage error, with click's
+// wording (cobra's own error is untyped and would exit 1).
+func requireFlag(cmd *cobra.Command, name string) error {
+	if !cmd.Flags().Changed(name) {
+		return &usageError{msg: fmt.Sprintf("Missing option '--%s'.", name)}
+	}
+	return nil
+}
+
+// helpUsage prints the command's help to stderr and exits 2, like click for a
+// group invoked without a subcommand.
+func helpUsage(cmd *cobra.Command) error {
+	cmd.SetOut(cmd.ErrOrStderr())
+	_ = cmd.Help()
+	return &usageError{}
+}
+
 // newRoot builds a fresh command tree so tests can run it repeatedly.
 func newRoot(out, errw io.Writer) *cobra.Command {
 	app := &appContext{}
 	root := &cobra.Command{
 		Use:           "gnpctl",
 		Short:         "gNMI discovery and path-catalog control for gnp-stack.",
+		Args:          usageArgs(cobra.NoArgs),
+		RunE:          func(cmd *cobra.Command, _ []string) error { return helpUsage(cmd) },
 		SilenceErrors: true,
 		SilenceUsage:  true,
 	}
+	root.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
+		return &usageError{msg: err.Error()}
+	})
 	root.CompletionOptions.DisableDefaultCmd = true
 	root.SetOut(out)
 	root.SetErr(errw)
@@ -98,6 +136,13 @@ func run(args []string, out, errw io.Writer) int {
 		var exit *exitError
 		if errors.As(err, &exit) {
 			return exit.code
+		}
+		var usage *usageError
+		if errors.As(err, &usage) {
+			if usage.msg != "" {
+				fmt.Fprintf(errw, "Error: %s\n", usage.msg)
+			}
+			return 2
 		}
 		fmt.Fprintf(errw, "Error: %s\n", err)
 		return 1
