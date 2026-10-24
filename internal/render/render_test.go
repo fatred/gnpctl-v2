@@ -132,7 +132,7 @@ func newState(t *testing.T) *state.State {
 
 func addTarget(t *testing.T, st *state.State, name, address string, port int, key, vendor, model, osVersion string) {
 	t.Helper()
-	if err := st.UpsertTarget(name, address, &port, "", ""); err != nil {
+	if err := st.UpsertTarget(name, new(address), &port, new(""), ""); err != nil {
 		t.Fatal(err)
 	}
 	if err := st.EnrichTarget(name, state.Enrichment{
@@ -539,7 +539,7 @@ func TestSecureRenderEmitsNoTLSWarning(t *testing.T) {
 
 func TestUndiscoveredAndKeylessTargetsSkipped(t *testing.T) {
 	st := miniState(t)
-	if err := st.UpsertTarget("undisc", "10.0.0.2", nil, "", ""); err != nil {
+	if err := st.UpsertTarget("undisc", new("10.0.0.2"), nil, new(""), ""); err != nil {
 		t.Fatal(err)
 	}
 	desired := compute(t, st, miniCatalog(t), defaultRenderConfig(t))

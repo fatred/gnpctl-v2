@@ -59,7 +59,7 @@ func TestSchemaCreatedInWAL(t *testing.T) {
 
 func TestInsertDefaults(t *testing.T) {
 	s := newState(t)
-	if err := s.UpsertTarget("leaf1", "10.0.0.1", nil, "nokia_srl", ""); err != nil {
+	if err := s.UpsertTarget("leaf1", new("10.0.0.1"), nil, new("nokia_srl"), ""); err != nil {
 		t.Fatalf("UpsertTarget: %v", err)
 	}
 	tgt, err := s.GetTarget("leaf1")
@@ -73,7 +73,7 @@ func TestInsertDefaults(t *testing.T) {
 
 func TestEnrichmentAtomicAndIdempotent(t *testing.T) {
 	s := newState(t)
-	if err := s.UpsertTarget("leaf1", "10.0.0.1", nil, "", ""); err != nil {
+	if err := s.UpsertTarget("leaf1", new("10.0.0.1"), nil, new(""), ""); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.EnrichTarget("leaf1", Enrichment{Discovered: true, LastDiscoveryRun: 100, CatalogKey: "k1", Vendor: "nokia"}); err != nil {
@@ -100,7 +100,7 @@ func TestEnrichmentAtomicAndIdempotent(t *testing.T) {
 
 func TestConnectionErrorPreservesRetryEligibility(t *testing.T) {
 	s := newState(t)
-	if err := s.UpsertTarget("leaf1", "10.0.0.1", nil, "", ""); err != nil {
+	if err := s.UpsertTarget("leaf1", new("10.0.0.1"), nil, new(""), ""); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.RecordTargetError("leaf1", errors.New("connection refused")); err != nil {
@@ -147,7 +147,7 @@ func TestSourceCRUDAndDuplicate(t *testing.T) {
 	} else if stateErr.Message != "source 'nb' already exists" {
 		t.Fatalf("message = %q", stateErr.Message)
 	}
-	if err := s.UpsertTarget("leaf1", "10.0.0.1", nil, "", ""); err != nil {
+	if err := s.UpsertTarget("leaf1", new("10.0.0.1"), nil, new(""), ""); err != nil {
 		t.Fatal(err)
 	}
 	removed, err := s.RemoveSource("nb")
@@ -198,7 +198,7 @@ func TestSourcePollOutcomes(t *testing.T) {
 func TestSelectionModes(t *testing.T) {
 	s := newState(t)
 	for _, n := range []string{"undisc", "fresh", "stale"} {
-		if err := s.UpsertTarget(n, "addr-"+n, nil, "", ""); err != nil {
+		if err := s.UpsertTarget(n, new("addr-"+n), nil, new(""), ""); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -246,7 +246,7 @@ func TestSelectionModes(t *testing.T) {
 
 func TestModuleColumnsCreatedWithDefaultZero(t *testing.T) {
 	s := newState(t, "ports", "bgp-peers")
-	if err := s.UpsertTarget("leaf1", "10.0.0.1", nil, "", ""); err != nil {
+	if err := s.UpsertTarget("leaf1", new("10.0.0.1"), nil, new(""), ""); err != nil {
 		t.Fatal(err)
 	}
 	for _, m := range []string{"ports", "bgp-peers"} {
@@ -266,7 +266,7 @@ func TestModuleColumnsCreatedWithDefaultZero(t *testing.T) {
 
 func TestModuleColumnsAdditiveWithoutTouchingRows(t *testing.T) {
 	s := newState(t, "ports")
-	if err := s.UpsertTarget("leaf1", "10.0.0.1", nil, "", ""); err != nil {
+	if err := s.UpsertTarget("leaf1", new("10.0.0.1"), nil, new(""), ""); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.SetModule("leaf1", "ports", 2); err != nil {
@@ -293,7 +293,7 @@ func TestModuleColumnsAdditiveWithoutTouchingRows(t *testing.T) {
 
 func TestEnabledModulesThreshold(t *testing.T) {
 	s := newState(t, "ports", "bgp-peers", "isis")
-	if err := s.UpsertTarget("leaf1", "10.0.0.1", nil, "", ""); err != nil {
+	if err := s.UpsertTarget("leaf1", new("10.0.0.1"), nil, new(""), ""); err != nil {
 		t.Fatal(err)
 	}
 	for m, v := range map[string]int{"ports": 1, "bgp-peers": 2, "isis": -1} {
@@ -312,7 +312,7 @@ func TestEnabledModulesThreshold(t *testing.T) {
 
 func TestReconcilePreservesForcedValues(t *testing.T) {
 	s := newState(t, "ports", "bgp-peers", "isis")
-	if err := s.UpsertTarget("leaf1", "10.0.0.1", nil, "", ""); err != nil {
+	if err := s.UpsertTarget("leaf1", new("10.0.0.1"), nil, new(""), ""); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.SetModule("leaf1", "ports", 2); err != nil {
@@ -339,7 +339,7 @@ func TestReconcilePreservesForcedValues(t *testing.T) {
 func TestShowFiltersUnion(t *testing.T) {
 	s := newState(t)
 	for _, n := range []string{"undisc", "errored", "ok"} {
-		if err := s.UpsertTarget(n, "addr-"+n, nil, "", ""); err != nil {
+		if err := s.UpsertTarget(n, new("addr-"+n), nil, new(""), ""); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -435,9 +435,32 @@ func TestOpensPythonDBAndAddsModuleColumn(t *testing.T) {
 	}
 }
 
+func TestNilInventoryTextIsStoredAsNull(t *testing.T) {
+	s := newState(t)
+	if err := s.UpsertTarget("inserted", nil, nil, nil, ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpsertTarget("updated", new("10.0.0.1"), nil, new("nokia_srl"), ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpsertTarget("updated", nil, nil, nil, ""); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"inserted", "updated"} {
+		tgt, err := s.GetTarget(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if tgt["address"] != nil || tgt["platform_hint"] != nil {
+			t.Errorf("%s: address/platform_hint = %#v/%#v, want NULL",
+				name, tgt["address"], tgt["platform_hint"])
+		}
+	}
+}
+
 func TestEmptyTextIsStoredAsEmpty(t *testing.T) {
 	s := newState(t)
-	if err := s.UpsertTarget("leaf1", "", nil, "", ""); err != nil {
+	if err := s.UpsertTarget("leaf1", new(""), nil, new(""), ""); err != nil {
 		t.Fatal(err)
 	}
 	tgt, err := s.GetTarget("leaf1")
@@ -502,7 +525,7 @@ func TestConcurrentDuplicateAddSourceReturnsStateError(t *testing.T) {
 
 func TestReconcileModulesRollsBackOnError(t *testing.T) {
 	s := newState(t, "bgp-peers")
-	if err := s.UpsertTarget("leaf1", "10.0.0.1", nil, "", ""); err != nil {
+	if err := s.UpsertTarget("leaf1", new("10.0.0.1"), nil, new(""), ""); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.SetModule("leaf1", "bgp-peers", 1); err != nil {
