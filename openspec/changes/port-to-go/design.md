@@ -40,3 +40,11 @@ Golden files: run the Python CLI against `tests/fixtures` once (task 1) and comm
 ## Model routing (user instruction)
 
 Coding: `deepseek/deepseek-flash`. Reviews: `anthropic/claude-opus-5-5:high`. Everything else (planning, scaffolding, orchestration, merges): `anthropic/claude-sonnet-5-5:high`. Commits use `~/.ssh/id_jhow_github` via repo-local `core.sshCommand`.
+
+## Recorded deviations from Python (decided after Opus review of tasks 2-6)
+
+- **TLS trust**: pygnmi ignores `GNMI_TLS_CA` and pins the certificate the device presents, so self-signed lab devices connect without configuration. Go verifies against system roots or `tls_ca` (the documented "validate TLS by default" policy). Lab devices need `tls_ca` or `skip_verify`. Deliberate; mention in release notes.
+- **Validation error text** omits pydantic's `[type=..., input_value=...]` suffix and docs URL; file path, field path and message text are kept.
+- **Duplicate YAML keys** in config/catalog files are an error in Go; PyYAML takes the last. Stricter by design.
+- **Connect timeout**: grpc-go's default connect timeout applies (no 5s readiness bound).
+- Catalog required-field checks use "empty string = missing"; pydantic accepts `""`. No shipped catalog entry relies on that.
