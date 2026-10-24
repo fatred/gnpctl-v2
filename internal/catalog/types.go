@@ -281,6 +281,20 @@ func clonePtr[T any](p *T) *T {
 	return &v
 }
 
+// yamlBool resolves a registry value the way PyYAML plus Python's bool() do:
+// a quoted scalar stays a string (bool("false") is True), while a plain YAML
+// 1.1 bool word is a boolean (bool(no) is False).
+func yamlBool(node *yaml.Node) bool {
+	if node.Kind == yaml.ScalarNode && node.Style != 0 {
+		return node.Value != ""
+	}
+	var value any
+	if err := node.Decode(&value); err != nil {
+		return true
+	}
+	return pyBool(value)
+}
+
 // pyBool mirrors Python's bool() after PyYAML has already resolved YAML 1.1
 // booleans (on/off/yes/no/true/false) in the raw text.
 func pyBool(v any) bool {
