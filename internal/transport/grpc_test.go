@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -30,9 +31,12 @@ type stubServer struct {
 	mu       sync.Mutex
 	username string
 	password string
+	authKeys map[string]bool
 	mode     gnmi.SubscriptionList_Mode
 	encoding gnmi.Encoding
 	path     *gnmi.Path
+
+	encodings []gnmi.Encoding // overrides the default capability list
 }
 
 func (s *stubServer) Capabilities(ctx context.Context, _ *gnmi.CapabilityRequest) (*gnmi.CapabilityResponse, error) {
@@ -40,12 +44,20 @@ func (s *stubServer) Capabilities(ctx context.Context, _ *gnmi.CapabilityRequest
 	s.mu.Lock()
 	s.username = first(md.Get("username"))
 	s.password = first(md.Get("password"))
+	s.authKeys = map[string]bool{}
+	for _, key := range []string{"username", "password"} {
+		_, s.authKeys[key] = md[key]
+	}
+	encodings := s.encodings
 	s.mu.Unlock()
+	if encodings == nil {
+		encodings = []gnmi.Encoding{gnmi.Encoding_JSON_IETF, gnmi.Encoding_PROTO}
+	}
 	return &gnmi.CapabilityResponse{
 		SupportedModels: []*gnmi.ModelData{
 			{Name: "srl_nokia-system", Organization: "Nokia", Version: "2023-10-31"},
 		},
-		SupportedEncodings: []gnmi.Encoding{gnmi.Encoding_JSON_IETF, gnmi.Encoding_PROTO},
+		SupportedEncodings: encodings,
 		GNMIVersion:        "0.10.0",
 	}, nil
 }
@@ -196,15 +208,95 @@ func TestLiveCapabilitiesAndSubscribeOnce(t *testing.T) {
 		t.Errorf("path = origin %q, %q; want origin eos_native, Eos/image", path.GetOrigin(), pathString(path))
 	}
 
-	// The transport applies no encoding default of its own: empty is the proto
-	// zero value, JSON.
+	// pygnmi defaults an unset encoding to json_ietf, not JSON.
 	if _, err := tr.SubscribeOnce([]string{"/system/information"}, ""); err != nil {
 		t.Fatal(err)
 	}
 	stub.mu.Lock()
 	encoding = stub.encoding
 	stub.mu.Unlock()
-	if encoding != gnmi.Encoding_JSON {
-		t.Errorf("encoding = %v, want JSON for an empty encoding", encoding)
+	if encoding != gnmi.Encoding_JSON_IETF {
+		t.Errorf("encoding = %v, want JSON_IETF for an empty encoding", encoding)
+	}
+
+	// A typo is an error, never a silent fallback to JSON.
+	if _, err := tr.SubscribeOnce([]string{"/system/information"}, "xml"); err == nil ||
+		!strings.Contains(err.Error(), "is not a valid Encoding") {
+		t.Errorf("unknown encoding error = %v", err)
+	}
+}
+
+func TestParsePathMatchesPygnmi(t *testing.T) {
+	cases := []struct{ in, origin, want string }{
+		{"/interfaces/interface[name=ethernet-1/1]/state", "", "interfaces/interface[name=ethernet-1/1]/state"},
+		{"rfc7951:/openconfig-system:system/state", "rfc7951", "openconfig-system:system/state"},
+		{"eos_native:/Eos/image", "eos_native", "Eos/image"},
+		{"/origin:cont/leaf", "origin", "cont/leaf"},
+		{"origin://", "origin", ""},
+		{"/interfaces/interface[name=eth0][type=phy]/state", "", "interfaces/interface[name=eth0][type=phy]/state"},
+		{"", "", ""},
+	}
+	for _, c := range cases {
+		path := parsePath(c.in)
+		if path.GetOrigin() != c.origin || pathString(path) != c.want {
+			t.Errorf("parsePath(%q) = origin %q, %q; want origin %q, %q",
+				c.in, path.GetOrigin(), pathString(path), c.origin, c.want)
+		}
+	}
+}
+
+func TestCapabilitiesEncodingsMatchPygnmi(t *testing.T) {
+	stub := &stubServer{encodings: []gnmi.Encoding{0, 1, 2, 3, 4, 5}}
+	host, port, caPath := startStub(t, stub)
+	tr, err := NewLiveTransport(host, port, "", "", false, caPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { tr.Close() })
+
+	caps, err := tr.Capabilities()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []any{"json", "bytes", "proto", "ascii", "json_ietf", "json_ietf"}
+	if !reflect.DeepEqual(caps["supported_encodings"], want) {
+		t.Errorf("encodings = %v, want %v", caps["supported_encodings"], want)
+	}
+}
+
+func TestEitherCredentialSendsBothMetadataKeys(t *testing.T) {
+	stub := &stubServer{}
+	host, port, caPath := startStub(t, stub)
+	tr, err := NewLiveTransport(host, port, "admin", "", false, caPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { tr.Close() })
+
+	if _, err := tr.Capabilities(); err != nil {
+		t.Fatal(err)
+	}
+	stub.mu.Lock()
+	username, password, keys := stub.username, stub.password, stub.authKeys
+	stub.mu.Unlock()
+	if username != "admin" || password != "" {
+		t.Errorf("metadata = %q/%q, want admin/\"\"", username, password)
+	}
+	if !keys["username"] || !keys["password"] {
+		t.Errorf("metadata keys sent = %v, want both username and password", keys)
+	}
+}
+
+func TestUntrustedServerCertificateIsRejected(t *testing.T) {
+	host, port, _ := startStub(t, &stubServer{})
+	_, _, otherCA := startStub(t, &stubServer{})
+	tr, err := NewLiveTransport(host, port, "", "", false, otherCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { tr.Close() })
+
+	if _, err := tr.Capabilities(); err == nil {
+		t.Fatal("Capabilities succeeded against a server whose certificate is not trusted")
 	}
 }
