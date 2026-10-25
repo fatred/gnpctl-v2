@@ -4,6 +4,7 @@ package catalog
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -369,6 +370,10 @@ func (v *VendorDef) validate() error {
 			}
 			if rule.Pattern == "" {
 				return fieldRequired("VendorDef", fmt.Sprintf("platform_probe.parse.%d.pattern", i))
+			}
+			// Go regexp is RE2: Python-only syntax (lookaround, backreferences) must fail at load, not per device.
+			if _, err := regexp.Compile(rule.Pattern); err != nil {
+				return valueError("VendorDef", fmt.Sprintf("platform_probe.parse.%d.pattern", i), "invalid RE2 pattern: "+err.Error())
 			}
 		}
 	}

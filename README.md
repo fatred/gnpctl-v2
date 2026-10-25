@@ -29,7 +29,7 @@ bin/gnpctl test
 bin/gnpctl render     # needs a `render:` block, see the Python docs/reference/configuration.md
 ```
 
-Commands, flags and the config file are unchanged from the Python version; see its
+Commands, flags and the config file are the same as the Python version (cobra adds a `help` command and usage-error wording differs); see its
 [CLI reference](https://github.com/fatred/gnpctl/blob/main/docs/reference/cli.md).
 
 ## Differences from the Python version
@@ -38,6 +38,7 @@ Commands, flags and the config file are unchanged from the Python version; see i
 - Rendered YAML is structurally identical (same keys, order and values) but formatted by `yaml.v3` (indented sequences, different quoting), not byte-identical to PyYAML output.
 - Config/catalog validation messages keep file, field and message but drop pydantic's `[type=…]` suffix and URL.
 - Duplicate YAML keys in config/catalog files are an error.
+- Catalog probe `pattern`s use Go RE2 syntax (no lookaround or backreferences); an incompatible pattern is a catalog load error naming the file and rule.
 
 Not ported: the `hwtest/` YANG-facts and hardware-capture harness (stays in the Python repo; the Go port only reads `catalog/yang`).
 
