@@ -1,0 +1,26 @@
+# Juniper vendor definition.
+#
+# Stage-1: capabilities advertise organization "Juniper". Stage-2 probe must use
+# Subscribe-ONCE — Junos serves gNMI Get for CONFIGURATION ONLY (a state Get
+# returns "Unimplemented: Supported only for configuration"). The probe reads the
+# name-keyed /components list and selects the routing-engine element by its type
+# leaf (CONTROLLER_CARD): its description carries the marketing model and its
+# software-version the running release. Validated against live QFX5k/QFX10k:
+#   RE description "RE-QFX5120-48Y-8C" / "RE-QFX10002-72Q"  (chassis description
+#     is unreliable on QFX5k — it is the assembly code "JNP48Y8C-CHAS")
+#   RE software-version "23.4R2-S4.11" / "23.4R2-S6.6"
+vendor: juniper
+fingerprint:
+  priority: 100
+  match:
+    org_contains: ["Juniper"]
+platform_probe:
+  path: /components/component[name=*]/state
+  encoding: proto
+  extract:
+    os_version: {where: {type: CONTROLLER_CARD}, leaf: software-version}
+  parse:
+    # "RE-QFX5120-48Y-8C" -> QFX5120-48Y-8C ; "RE-QFX10002-72Q" -> QFX10002-72Q
+    - where: {type: CONTROLLER_CARD}
+      from: description
+      pattern: '^(?:RE-)?(?P<model>.+)$'

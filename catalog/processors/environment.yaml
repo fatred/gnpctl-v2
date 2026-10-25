@@ -1,0 +1,71 @@
+# Environment (egress, gnmic 0.46): component temperature + fan speed -> common metrics:
+#   temperature_celsius   gauge (Celsius; per component/sensor — Celsius on every platform)
+#   fan_speed_percent     gauge (percent)
+#
+# Four-corner-validated on prod (make validate clean): temperature_celsius on juniper-mx
+# (qfx-core-01, QFX10k), nokia-srlinux (srl-leaf-01), nokia-sros (sros-edge-01);
+# fan_speed_percent on nokia-srlinux + nokia-sros. juniper-qfx (QFX5k leaf) has no OC
+# /components temperature, so no environment module.
+#
+# fan_speed_rpm was dropped: the YANG defines rpm leaves (juniper openconfig-platform-fan,
+# SR Linux fan-tray/speed-rpm), but NO device on the fleet serves them — Junos 23.4R2 does
+# not implement openconfig-platform-fan, the SR Linux devices expose only `speed` (percent),
+# and SR OS reports percent. Re-add rpm (it's a clean fan-rename + convert/keep entry) if a
+# device ever does. The rename matches by mutually-exclusive path suffix, so one shared chain
+# serves every vendor; convert + keep match the canonical names. Temperature needs no scaling.
+#
+# Verified leaves:
+#   SR OS    : /state/.../hardware-data/temperature (int32 C);
+#              /state/chassis/fan[fan-slot=*]/speed (percent)
+#   juniper  : /components/component/state/temperature/instant (OC decimal64 C)
+#              [QFX10k spine only — the QFX5k Broadcom leaf has no OC /components temperature]
+#   SR Linux : /platform/control[slot=*]/temperature/instant (int16 C);
+#              /platform/fan-tray[id=*]/speed (percent)
+
+# Map the per-vendor temperature leaf to the common metric (mutually-exclusive suffixes).
+environment-temp-rename:
+  event-strings:
+    value-names:
+      - ".*/temperature/instant$"
+      - ".*/hardware-data/temperature$"
+    transforms:
+      - replace:
+          apply-on: name
+          old: ".*/temperature/instant$"
+          new: temperature_celsius
+      - replace:
+          apply-on: name
+          old: ".*/hardware-data/temperature$"
+          new: temperature_celsius
+
+# Map fan speed (percent) to the common metric — SR OS /fan/speed and SR Linux
+# /fan-tray/speed both report a percentage.
+environment-fan-rename:
+  event-strings:
+    value-names:
+      - ".*/fan/speed$"
+      - ".*/fan-tray/speed$"
+    transforms:
+      - replace:
+          apply-on: name
+          old: ".*/fan/speed$"
+          new: fan_speed_percent
+      - replace:
+          apply-on: name
+          old: ".*/fan-tray/speed$"
+          new: fan_speed_percent
+
+# Coerce to numeric (SRL/SROS emit ints/decimals as JSON strings).
+environment-convert:
+  event-convert:
+    value-names:
+      - "^temperature_celsius$"
+      - "^fan_speed_percent$"
+    type: float
+
+# Keep only the common metrics; drop sibling leaves (thresholds, margins, alarm status).
+environment-keep:
+  event-allow:
+    value-names:
+      - "^temperature_celsius$"
+      - "^fan_speed_percent$"

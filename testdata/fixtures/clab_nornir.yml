@@ -1,0 +1,6 @@
+leaf1:
+  hostname: 172.20.20.3
+  platform: nokia_srl
+spine1:
+  hostname: 172.20.20.4
+  platform: arista_eos

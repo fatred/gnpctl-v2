@@ -1,0 +1,69 @@
+# Transceivers / optical DOM (egress, gnmic 0.46). Normalize per-vendor optical
+# leaves to common numeric metrics (unit in the name, Prometheus convention):
+#   transceiver_input_power_dbm   (Rx optical power, dBm)
+#   transceiver_output_power_dbm  (Tx optical power, dBm)
+#   transceiver_laser_bias_ma     (laser bias current, mA)
+#   transceiver_temperature_celsius
+#   labels: path keys gnmic emits as tags (interface name, channel index).
+#
+# Verified leaves/units (srl_nokia-interfaces.yang v24.10):
+#   input-power/latest-value      decimal64, "optical Rx power in dBm"
+#   output-power/latest-value     decimal64, Tx power in dBm
+#   laser-bias-current/latest-value  decimal64, "laser bias current in mA"
+#   temperature/latest-value      srl_nokia-comm:temperature, degrees Celsius
+# nokia subscribes both transceiver-level and per-channel (channel index -> tag);
+# juniper (OpenConfig) uses .../physical-channels/channel/state/<leaf>/instant, so
+# the rename matches latest-value OR instant. Validated on prod Juniper too (site A,
+# QFX5k/QFX10k @ 23.4R2). SRL emits decimal64 as JSON strings, so transceiver-convert (-> float) is
+# required. Temperature is transceiver-level only (juniper exposes it at the
+# component, not in this channel-state path).
+#
+# Validated on PRODUCTION SRL (srl-leaf-01, gnmic 0.46, real optics):
+# transceiver_input_power_dbm / output_power_dbm / laser_bias_ma / temperature_celsius,
+# numeric, with interface_name + channel_index (per-channel) tags.
+
+# Rename the current-value optical leaves to common metric names. Suffixes are
+# mutually exclusive (input/output/laser-bias/temperature differ).
+transceiver-rename:
+  event-strings:
+    value-names:
+      - ".*input-power/(latest-value|instant)$"
+      - ".*output-power/(latest-value|instant)$"
+      - ".*laser-bias-current/(latest-value|instant)$"
+      - ".*temperature/(latest-value|instant)$"
+    transforms:
+      - replace:
+          apply-on: name
+          old: ".*input-power/(latest-value|instant)$"
+          new: transceiver_input_power_dbm
+      - replace:
+          apply-on: name
+          old: ".*output-power/(latest-value|instant)$"
+          new: transceiver_output_power_dbm
+      - replace:
+          apply-on: name
+          old: ".*laser-bias-current/(latest-value|instant)$"
+          new: transceiver_laser_bias_ma
+      - replace:
+          apply-on: name
+          old: ".*temperature/(latest-value|instant)$"
+          new: transceiver_temperature_celsius
+
+# SRL emits decimal64 as JSON strings; coerce to numeric for Prometheus.
+transceiver-convert:
+  event-convert:
+    value-names:
+      - "^transceiver_input_power_dbm$"
+      - "^transceiver_output_power_dbm$"
+      - "^transceiver_laser_bias_ma$"
+      - "^transceiver_temperature_celsius$"
+    type: float
+
+# Keep only the common metrics; drop alarm-condition/min/max/avg sibling leaves.
+transceiver-keep:
+  event-allow:
+    value-names:
+      - "^transceiver_input_power_dbm$"
+      - "^transceiver_output_power_dbm$"
+      - "^transceiver_laser_bias_ma$"
+      - "^transceiver_temperature_celsius$"

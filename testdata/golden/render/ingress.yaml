@@ -1,0 +1,219 @@
+skip-verify: false
+username: ${TARGET_USER}
+password: ${TARGET_PASS}
+loader:
+  type: file
+  path: targets.yaml
+subscriptions:
+  arista-eos-ports:
+    stream-subscriptions:
+    - paths:
+      - /interfaces/interface/state/counters
+      stream-mode: sample
+      sample-interval: 30s
+    outputs:
+    - arista-eos-ports
+  nokia-srlinux-environment:
+    stream-subscriptions:
+    - paths:
+      - /platform/control[slot=*]/temperature/instant
+      - /platform/fan-tray[id=*]/speed
+      stream-mode: sample
+      sample-interval: 60s
+    outputs:
+    - nokia-srlinux-environment
+  nokia-srlinux-mempools:
+    stream-subscriptions:
+    - paths:
+      - /platform/control[slot=*]/memory
+      stream-mode: sample
+      sample-interval: 15s
+    outputs:
+    - nokia-srlinux-mempools
+  nokia-srlinux-ports:
+    stream-subscriptions:
+    - paths:
+      - /interface/description
+      - /interface[name=*]/admin-state
+      - /interface[name=*]/ethernet/port-speed
+      - /interface[name=*]/last-change
+      - /interface[name=*]/oper-state
+      - /interface[name=*]/statistics
+      - /interface[name=*]/subinterface[index=*]/statistics
+      stream-mode: sample
+      sample-interval: 15s
+    outputs:
+    - nokia-srlinux-ports
+  nokia-srlinux-processors:
+    stream-subscriptions:
+    - paths:
+      - /platform/control[slot=*]/cpu[index=*]/total/instant
+      stream-mode: sample
+      sample-interval: 15s
+    outputs:
+    - nokia-srlinux-processors
+  nokia-srlinux-sensors:
+    stream-subscriptions:
+    - paths:
+      - /platform/power-supply[id=*]/oper-state
+      stream-mode: sample
+      sample-interval: 15s
+    outputs:
+    - nokia-srlinux-sensors
+  nokia-srlinux-services:
+    stream-subscriptions:
+    - paths:
+      - /system/event-handler/instance[name=*]/oper-state
+      stream-mode: sample
+      sample-interval: 15s
+    outputs:
+    - nokia-srlinux-services
+  nokia-srlinux-storage:
+    stream-subscriptions:
+    - paths:
+      - /platform/control[slot=*]/disk[name=*]/partition[name=*]
+      stream-mode: sample
+      sample-interval: 15s
+    outputs:
+    - nokia-srlinux-storage
+  nokia-srlinux-transceivers:
+    stream-subscriptions:
+    - paths:
+      - /interface[name=*]/transceiver/channel[index=*]/input-power
+      - /interface[name=*]/transceiver/channel[index=*]/laser-bias-current/latest-value
+      - /interface[name=*]/transceiver/channel[index=*]/output-power
+      - /interface[name=*]/transceiver/input-power
+      - /interface[name=*]/transceiver/laser-bias-current/latest-value
+      - /interface[name=*]/transceiver/output-power
+      - /interface[name=*]/transceiver/temperature/latest-value
+      stream-mode: sample
+      sample-interval: 15s
+    outputs:
+    - nokia-srlinux-transceivers
+outputs:
+  arista-eos-ports:
+    type: jetstream
+    address: nats:4222
+    stream: arista-eos-ports
+    subject-format: subscription.target
+    format: event
+    num-workers: 1
+    write-timeout: 5s
+    connect-time-wait: 2s
+    create-stream:
+      retention-policy: workqueue
+      storage: memory
+      subjects: []
+      max-age: 1m
+  nokia-srlinux-environment:
+    type: jetstream
+    address: nats:4222
+    stream: nokia-srlinux-environment
+    subject-format: subscription.target
+    format: event
+    num-workers: 1
+    write-timeout: 5s
+    connect-time-wait: 2s
+    create-stream:
+      retention-policy: workqueue
+      storage: memory
+      subjects: []
+      max-age: 1m
+  nokia-srlinux-mempools:
+    type: jetstream
+    address: nats:4222
+    stream: nokia-srlinux-mempools
+    subject-format: subscription.target
+    format: event
+    num-workers: 1
+    write-timeout: 5s
+    connect-time-wait: 2s
+    create-stream:
+      retention-policy: workqueue
+      storage: memory
+      subjects: []
+      max-age: 1m
+  nokia-srlinux-ports:
+    type: jetstream
+    address: nats:4222
+    stream: nokia-srlinux-ports
+    subject-format: subscription.target
+    format: event
+    num-workers: 1
+    write-timeout: 5s
+    connect-time-wait: 2s
+    create-stream:
+      retention-policy: workqueue
+      storage: memory
+      subjects: []
+      max-age: 1m
+  nokia-srlinux-processors:
+    type: jetstream
+    address: nats:4222
+    stream: nokia-srlinux-processors
+    subject-format: subscription.target
+    format: event
+    num-workers: 1
+    write-timeout: 5s
+    connect-time-wait: 2s
+    create-stream:
+      retention-policy: workqueue
+      storage: memory
+      subjects: []
+      max-age: 1m
+  nokia-srlinux-sensors:
+    type: jetstream
+    address: nats:4222
+    stream: nokia-srlinux-sensors
+    subject-format: subscription.target
+    format: event
+    num-workers: 1
+    write-timeout: 5s
+    connect-time-wait: 2s
+    create-stream:
+      retention-policy: workqueue
+      storage: memory
+      subjects: []
+      max-age: 1m
+  nokia-srlinux-services:
+    type: jetstream
+    address: nats:4222
+    stream: nokia-srlinux-services
+    subject-format: subscription.target
+    format: event
+    num-workers: 1
+    write-timeout: 5s
+    connect-time-wait: 2s
+    create-stream:
+      retention-policy: workqueue
+      storage: memory
+      subjects: []
+      max-age: 1m
+  nokia-srlinux-storage:
+    type: jetstream
+    address: nats:4222
+    stream: nokia-srlinux-storage
+    subject-format: subscription.target
+    format: event
+    num-workers: 1
+    write-timeout: 5s
+    connect-time-wait: 2s
+    create-stream:
+      retention-policy: workqueue
+      storage: memory
+      subjects: []
+      max-age: 1m
+  nokia-srlinux-transceivers:
+    type: jetstream
+    address: nats:4222
+    stream: nokia-srlinux-transceivers
+    subject-format: subscription.target
+    format: event
+    num-workers: 1
+    write-timeout: 5s
+    connect-time-wait: 2s
+    create-stream:
+      retention-policy: workqueue
+      storage: memory
+      subjects: []
+      max-age: 1m

@@ -1,0 +1,387 @@
+inputs:
+  arista-eos-ports:
+    type: jetstream
+    address: nats:4222
+    stream: arista-eos-ports
+    format: event
+    deliver-policy: all
+    num-workers: 10
+    buffer-size: 10000
+    fetch-batch-size: 500
+    max-ack-pending: 100000
+    event-processors:
+    - gnpctl-meta
+    outputs:
+    - prometheus
+  nokia-srlinux-environment:
+    type: jetstream
+    address: nats:4222
+    stream: nokia-srlinux-environment
+    format: event
+    deliver-policy: all
+    num-workers: 10
+    buffer-size: 10000
+    fetch-batch-size: 500
+    max-ack-pending: 100000
+    event-processors:
+    - environment-temp-rename
+    - environment-fan-rename
+    - environment-convert
+    - environment-keep
+    - add-federate
+    outputs:
+    - prometheus
+  nokia-srlinux-mempools:
+    type: jetstream
+    address: nats:4222
+    stream: nokia-srlinux-mempools
+    format: event
+    deliver-policy: all
+    num-workers: 10
+    buffer-size: 10000
+    fetch-batch-size: 500
+    max-ack-pending: 100000
+    event-processors:
+    - memory-rename
+    - memory-convert
+    - memory-keep
+    - add-federate
+    outputs:
+    - prometheus
+  nokia-srlinux-ports:
+    type: jetstream
+    address: nats:4222
+    stream: nokia-srlinux-ports
+    format: event
+    deliver-policy: all
+    num-workers: 10
+    buffer-size: 10000
+    fetch-batch-size: 500
+    max-ack-pending: 100000
+    event-processors:
+    - gnpctl-meta
+    outputs:
+    - prometheus
+  nokia-srlinux-processors:
+    type: jetstream
+    address: nats:4222
+    stream: nokia-srlinux-processors
+    format: event
+    deliver-policy: all
+    num-workers: 10
+    buffer-size: 10000
+    fetch-batch-size: 500
+    max-ack-pending: 100000
+    event-processors:
+    - cpu-rename
+    - cpu-convert
+    - cpu-keep
+    - add-federate
+    outputs:
+    - prometheus
+  nokia-srlinux-sensors:
+    type: jetstream
+    address: nats:4222
+    stream: nokia-srlinux-sensors
+    format: event
+    deliver-policy: all
+    num-workers: 10
+    buffer-size: 10000
+    fetch-batch-size: 500
+    max-ack-pending: 100000
+    event-processors:
+    - sensors-state
+    - sensors-keep
+    - add-federate
+    outputs:
+    - prometheus
+  nokia-srlinux-services:
+    type: jetstream
+    address: nats:4222
+    stream: nokia-srlinux-services
+    format: event
+    deliver-policy: all
+    num-workers: 10
+    buffer-size: 10000
+    fetch-batch-size: 500
+    max-ack-pending: 100000
+    event-processors: []
+    outputs:
+    - prometheus
+  nokia-srlinux-storage:
+    type: jetstream
+    address: nats:4222
+    stream: nokia-srlinux-storage
+    format: event
+    deliver-policy: all
+    num-workers: 10
+    buffer-size: 10000
+    fetch-batch-size: 500
+    max-ack-pending: 100000
+    event-processors:
+    - storage-rename
+    - storage-convert
+    - storage-keep
+    - add-federate
+    outputs:
+    - prometheus
+  nokia-srlinux-transceivers:
+    type: jetstream
+    address: nats:4222
+    stream: nokia-srlinux-transceivers
+    format: event
+    deliver-policy: all
+    num-workers: 10
+    buffer-size: 10000
+    fetch-batch-size: 500
+    max-ack-pending: 100000
+    event-processors:
+    - transceiver-rename
+    - transceiver-convert
+    - transceiver-keep
+    - add-federate
+    outputs:
+    - prometheus
+outputs:
+  prometheus:
+    type: prometheus_write
+    url: http://prometheus:9090/api/v1/write
+    interval: 2s
+    buffer-size: 100000
+    max-time-series-per-write: 10000
+    timeout: 10s
+    num-workers: 10
+processors:
+  cpu-convert:
+    event-convert:
+      value-names:
+      - ^cpu_utilization$
+      type: float
+  cpu-keep:
+    event-allow:
+      value-names:
+      - ^cpu_utilization$
+  cpu-rename:
+    event-strings:
+      value-names:
+      - .*cpu.*instant$
+      transforms:
+      - replace:
+          apply-on: name
+          old: .*cpu.*instant$
+          new: cpu_utilization
+  environment-convert:
+    event-convert:
+      value-names:
+      - ^temperature_celsius$
+      - ^fan_speed_percent$
+      type: float
+  environment-fan-rename:
+    event-strings:
+      value-names:
+      - .*/fan/speed$
+      - .*/fan-tray/speed$
+      transforms:
+      - replace:
+          apply-on: name
+          old: .*/fan/speed$
+          new: fan_speed_percent
+      - replace:
+          apply-on: name
+          old: .*/fan-tray/speed$
+          new: fan_speed_percent
+  environment-keep:
+    event-allow:
+      value-names:
+      - ^temperature_celsius$
+      - ^fan_speed_percent$
+  environment-temp-rename:
+    event-strings:
+      value-names:
+      - .*/temperature/instant$
+      - .*/hardware-data/temperature$
+      transforms:
+      - replace:
+          apply-on: name
+          old: .*/temperature/instant$
+          new: temperature_celsius
+      - replace:
+          apply-on: name
+          old: .*/hardware-data/temperature$
+          new: temperature_celsius
+  gnpctl-meta:
+    event-add-tag:
+      overwrite: false
+      add:
+        pipeline: gnpctl
+  memory-convert:
+    event-convert:
+      value-names:
+      - ^memory_total_bytes$
+      - ^memory_used_bytes$
+      - ^memory_free_bytes$
+      - ^memory_reserved_bytes$
+      - ^memory_utilization$
+      type: float
+  memory-keep:
+    event-allow:
+      value-names:
+      - ^memory_total_bytes$
+      - ^memory_used_bytes$
+      - ^memory_free_bytes$
+      - ^memory_reserved_bytes$
+      - ^memory_utilization$
+  memory-rename:
+    event-strings:
+      value-names:
+      - .*memory.*
+      transforms:
+      - replace:
+          apply-on: name
+          old: .*memory.*/physical$
+          new: memory_total_bytes
+      - replace:
+          apply-on: name
+          old: .*memory.*/available$
+          new: memory_total_bytes
+      - replace:
+          apply-on: name
+          old: .*memory.*/utilized$
+          new: memory_used_bytes
+      - replace:
+          apply-on: name
+          old: .*memory.*/used$
+          new: memory_used_bytes
+      - replace:
+          apply-on: name
+          old: .*memory.*/free$
+          new: memory_free_bytes
+      - replace:
+          apply-on: name
+          old: .*memory.*/reserved$
+          new: memory_reserved_bytes
+      - replace:
+          apply-on: name
+          old: .*memory.*/utilization$
+          new: memory_utilization
+  sensors-keep:
+    event-allow:
+      value-names:
+      - ^power_supply_state$
+  sensors-state:
+    event-jq:
+      expression: 'map((.values // {}) as $v | ($v|keys|map(select(test("oper-stat(e|us)$"))))
+        as $k | if ($k|length) > 0 then ($v[$k[0]]) as $raw | ($raw|ascii_upcase)
+        as $s | .tags.oper_state = $raw | .values = {"power_supply_state": (if ["UP","ACTIVE"]|index($s)
+        then 1 elif ["DOWN","FAILED","DEGRADED","LOW-POWER","INACTIVE"]|index($s)
+        then 0 else -1 end)} else . end)'
+  storage-convert:
+    event-convert:
+      value-names:
+      - ^storage_total_bytes$
+      - ^storage_used_bytes$
+      - ^storage_free_bytes$
+      - ^storage_utilization$
+      type: float
+  storage-keep:
+    event-allow:
+      value-names:
+      - ^storage_total_bytes$
+      - ^storage_used_bytes$
+      - ^storage_free_bytes$
+      - ^storage_utilization$
+  storage-rename:
+    event-strings:
+      value-names:
+      - .*/size$
+      - .*/used$
+      - .*/utilized$
+      - .*/free$
+      - .*/available$
+      - .*/percent-used$
+      transforms:
+      - replace:
+          apply-on: name
+          old: .*/size$
+          new: storage_total_bytes
+      - replace:
+          apply-on: name
+          old: .*/used$
+          new: storage_used_bytes
+      - replace:
+          apply-on: name
+          old: .*/utilized$
+          new: storage_used_bytes
+      - replace:
+          apply-on: name
+          old: .*/free$
+          new: storage_free_bytes
+      - replace:
+          apply-on: name
+          old: .*/available$
+          new: storage_free_bytes
+      - replace:
+          apply-on: name
+          old: .*/percent-used$
+          new: storage_utilization
+  transceiver-convert:
+    event-convert:
+      value-names:
+      - ^transceiver_input_power_dbm$
+      - ^transceiver_output_power_dbm$
+      - ^transceiver_laser_bias_ma$
+      - ^transceiver_temperature_celsius$
+      type: float
+  transceiver-keep:
+    event-allow:
+      value-names:
+      - ^transceiver_input_power_dbm$
+      - ^transceiver_output_power_dbm$
+      - ^transceiver_laser_bias_ma$
+      - ^transceiver_temperature_celsius$
+  transceiver-rename:
+    event-strings:
+      value-names:
+      - .*input-power/(latest-value|instant)$
+      - .*output-power/(latest-value|instant)$
+      - .*laser-bias-current/(latest-value|instant)$
+      - .*temperature/(latest-value|instant)$
+      transforms:
+      - replace:
+          apply-on: name
+          old: .*input-power/(latest-value|instant)$
+          new: transceiver_input_power_dbm
+      - replace:
+          apply-on: name
+          old: .*output-power/(latest-value|instant)$
+          new: transceiver_output_power_dbm
+      - replace:
+          apply-on: name
+          old: .*laser-bias-current/(latest-value|instant)$
+          new: transceiver_laser_bias_ma
+      - replace:
+          apply-on: name
+          old: .*temperature/(latest-value|instant)$
+          new: transceiver_temperature_celsius
+  add-federate:
+    event-add-tag:
+      overwrite: false
+      value-names:
+      - ^cpu_utilization$
+      - ^fan_speed_percent$
+      - ^memory_free_bytes$
+      - ^memory_reserved_bytes$
+      - ^memory_total_bytes$
+      - ^memory_utilization$
+      - ^power_supply_state$
+      - ^storage_free_bytes$
+      - ^storage_total_bytes$
+      - ^storage_used_bytes$
+      - ^storage_utilization$
+      - ^temperature_celsius$
+      - ^transceiver_input_power_dbm$
+      - ^transceiver_laser_bias_ma$
+      - ^transceiver_output_power_dbm$
+      - ^transceiver_temperature_celsius$
+      add:
+        federate: 'true'

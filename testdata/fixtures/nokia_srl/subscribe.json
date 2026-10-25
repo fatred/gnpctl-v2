@@ -1,0 +1,6 @@
+{
+  "/system/information": {
+    "srl_nokia-system:system/srl_nokia-system-info:information/version": "v24.10.4-244-g5c0afd1a61",
+    "srl_nokia-system:system/srl_nokia-system-info:information/description": "SRLinux-v24.10.4-244-g5c0afd1a61 7220 IXR-D2L Copyright (c) 2000-2025 Nokia."
+  }
+}

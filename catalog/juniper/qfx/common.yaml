@@ -1,0 +1,199 @@
+# Juniper QFX5k variant (Broadcom silicon) — /system-style telemetry.
+#
+# Selection is by probe model: QFX5* (four-corner validated on prod site A @ 23.4R2:
+# QFX5120-48Y-8C).
+#
+# Subscription paths are verbatim from the production gnmic ingestor
+# (juniper-leaf-sub-stats @2m; juniper-sub-interfaces @2m;
+# juniper-leaf-spine-sub-comms @2m). This variant is the leaf role: CPU/memory/
+# disk come from /system (Broadcom), PSU from /components; BGP runs everywhere
+# (default on); there is no ISIS on the leaves.
+key: juniper-qfx
+vendor: juniper
+platform_match:
+  model: ["QFX5*"]
+default_port: 57400
+encoding: proto
+platform_hints: ["juniper_qfx", "juniper_qfx5k"]
+
+modules:
+  processors:
+    processors: [cpu-rename, cpu-convert, cpu-keep]
+    metrics:
+      cpu_utilization:
+        type: numeric
+        federate: true
+        yang: oc-cpu-utilization-instant
+    paths:
+      - key: cpu
+        path: /system/cpus/cpu/state/total
+        mode: sample
+        sample_interval: 2m
+        yang: oc-cpu-utilization-instant
+        description: "System CPU utilisation"
+
+  mempools:
+    processors: [memory-rename, memory-convert, memory-keep]
+    metrics:
+      memory_total_bytes:
+        type: numeric
+        federate: true
+        yang: oc-system-memory-physical
+      memory_reserved_bytes:
+        type: numeric
+        federate: true
+        yang: oc-system-memory-reserved
+    paths:
+      - key: mem
+        path: /system/memory/state
+        mode: sample
+        sample_interval: 2m
+        description: "System memory utilisation"
+
+  storage:
+    processors: [storage-rename, storage-convert, storage-keep]
+    metrics:
+      # NOTE: OpenConfig /system mount-point reports megabytes, not bytes — the
+      # shared storage chain still names these *_bytes (cross-vendor metric name).
+      storage_total_bytes:
+        type: numeric
+        federate: true
+        yang: oc-system-mount-point-size
+      storage_used_bytes:
+        type: numeric
+        federate: true
+        yang: oc-system-mount-point-utilized
+      storage_free_bytes:
+        type: numeric
+        federate: true
+        yang: oc-system-mount-point-available
+    paths:
+      - key: disks
+        path: /system/mount-points/mount-point/state
+        mode: sample
+        sample_interval: 2m
+        description: "Mount-point / disk usage"
+
+  sensors:
+    processors: [sensors-state, sensors-keep]
+    metrics:
+      power_supply_state:
+        type: state
+        federate: true
+        yang: oc-component-oper-status
+        required_labels:
+          - oper_state
+        map:
+          ACTIVE: 1
+          INACTIVE: 0
+          DISABLED: -1
+    paths:
+      - key: psu
+        path: /components/component/state[type=POWER_SUPPLY]
+        mode: sample
+        sample_interval: 2m
+        yang: oc-component-oper-status
+        description: "Power-supply component state"
+
+  # No environment module: the QFX5k Broadcom leaf does not implement OpenConfig
+  # /components temperature (it rejects /components/component/state/temperature/instant as
+  # an unsupported path — it's the /system-telemetry variant). The QFX10k spine (juniper-mx)
+  # does expose it. No OC fan on Junos either. No known OC env path on the leaf.
+
+  ports:
+    processors: [gnpctl-meta]
+    paths:
+      - key: intf-admin-status
+        path: /interfaces/interface/state/admin-status
+        mode: sample
+        sample_interval: 2m
+        description: "Interface admin status"
+      - key: intf-description
+        path: /interfaces/interface/state/description
+        mode: sample
+        sample_interval: 2m
+        description: "Interface description"
+      - key: intf-oper-status
+        path: /interfaces/interface/state/oper-status
+        mode: sample
+        sample_interval: 2m
+        description: "Interface operational status"
+      - key: intf-counters
+        path: /interfaces/interface/state/counters
+        mode: sample
+        sample_interval: 2m
+        description: "Interface counters"
+      - key: subintf-counters
+        path: /interfaces/interface/subinterfaces/subinterface/state/counters
+        mode: sample
+        sample_interval: 2m
+        description: "Subinterface counters"
+
+  transceivers:
+    processors: [transceiver-rename, transceiver-convert, transceiver-keep]
+    metrics:
+      transceiver_input_power_dbm:
+        type: numeric
+        federate: true
+        yang: oc-xcvr-input-power-instant
+      transceiver_output_power_dbm:
+        type: numeric
+        federate: true
+        yang: oc-xcvr-output-power-instant
+      transceiver_laser_bias_ma:
+        type: numeric
+        federate: true
+        yang: oc-xcvr-laser-bias-instant
+    paths:
+      - key: xcvr-channel
+        path: /components/component/transceiver/physical-channels/channel/state
+        mode: sample
+        sample_interval: 2m
+        description: "Transceiver per-channel state"
+
+  bgp-peers:
+    default: on  # BGP runs across this fabric
+    processors: [bgp-info, bgp-fsm, bgp-fsm-convert, bgp-rename, bgp-keep-state]
+    metrics:
+      bgp_neighbor_session_state:
+        type: state
+        federate: true
+        yang: oc-bgp-neighbor-session-state
+        map:
+          IDLE: 1
+          CONNECT: 2
+          ACTIVE: 3
+          OPENSENT: 4
+          OPENCONFIRM: 5
+          ESTABLISHED: 6
+      bgp_neighbor_peer_group:
+        type: info
+        federate: true
+        required_labels:
+          - peer_group
+      bgp_neighbor_description:
+        type: info
+        federate: true
+        required_labels:
+          - description
+    paths:
+      - key: bgp-session-state
+        path: /network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/session-state
+        mode: sample
+        sample_interval: 2m
+        description: "BGP neighbor session state"
+      - key: bgp-last-established
+        path: /network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/last-established
+        mode: sample
+        sample_interval: 2m
+        description: "BGP neighbor last-established"
+      - key: bgp-description
+        path: /network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/description
+        mode: sample
+        sample_interval: 2m
+        description: "BGP neighbor description"
+      - key: bgp-peer-group
+        path: /network-instances/network-instance/protocols/protocol/bgp/neighbors/neighbor/state/peer-group
+        mode: sample
+        sample_interval: 2m
+        description: "BGP neighbor peer-group"
