@@ -64,71 +64,95 @@ func RunTest(
 	results := []TargetTestResult{}
 	anyFailed := false
 	for _, row := range targets {
-		name, _ := row["name"].(string)
-		key, _ := row["catalog_key"].(string)
-		variant := cat.Variant(key)
-		if variant == nil {
-			results = append(results, TargetTestResult{Name: name, Ready: false})
-			continue
-		}
-
-		profile, err := cat.EffectiveProfile(key, rowOSVersion(row))
+		result, failed, err := testTarget(st, cat, row, names, factory)
 		if err != nil {
 			return results, anyFailed, err
 		}
-		enabledNames, err := st.EnabledModules(name, names)
-		if err != nil {
-			return results, anyFailed, err
+		if failed {
+			anyFailed = true
 		}
-		enabled := make(map[string]bool, len(enabledNames))
-		for _, module := range enabledNames {
-			enabled[module] = true
-		}
-		var paths []string
-		for _, moduleName := range profile.Modules.Names() {
-			if !enabled[moduleName] {
-				continue
-			}
-			module, _ := profile.Modules.Get(moduleName)
-			for _, path := range module.Paths {
-				paths = append(paths, path.Path)
-			}
-		}
-
-		port := rowInt(row, "port")
-		if port == 0 {
-			port = transport.DefaultGNMIPort
-		}
-		gnmi, err := factory(row, port)
-		if err != nil {
-			return results, anyFailed, err
-		}
-
-		pathResults := []PathResult{}
-		for _, path := range paths {
-			updates, err := gnmi.SubscribeOnce([]string{path}, encoding(variant))
-			if err != nil {
-				pathResults = append(pathResults, PathResult{Path: path, Detail: err.Error()})
-				anyFailed = true
-				continue
-			}
-			ok := false
-			for _, update := range updates {
-				if update.Value != nil {
-					ok = true
-					break
-				}
-			}
-			result := PathResult{Path: path, OK: ok}
-			if !ok {
-				result.Detail = "no data"
-				anyFailed = true
-			}
-			pathResults = append(pathResults, result)
-		}
-		results = append(results, TargetTestResult{Name: name, Ready: true, Results: pathResults})
+		results = append(results, result)
 	}
 	return results, anyFailed, nil
+}
+
+// testTarget tests one target's enabled paths; the transport is closed when the
+// target is done so a long fleet run does not hold every connection open.
+func testTarget(
+	st *state.State,
+	cat *catalog.LayeredCatalog,
+	row map[string]any,
+	names []string,
+	factory pipeline.TransportFactory,
+) (TargetTestResult, bool, error) {
+	name, _ := row["name"].(string)
+	key, _ := row["catalog_key"].(string)
+	variant := cat.Variant(key)
+	if variant == nil {
+		return TargetTestResult{Name: name, Ready: false}, false, nil
+	}
+
+	profile, err := cat.EffectiveProfile(key, rowOSVersion(row))
+	if err != nil {
+		return TargetTestResult{}, false, err
+	}
+	enabledNames, err := st.EnabledModules(name, names)
+	if err != nil {
+		return TargetTestResult{}, false, err
+	}
+	enabled := make(map[string]bool, len(enabledNames))
+	for _, module := range enabledNames {
+		enabled[module] = true
+	}
+	var paths []string
+	for _, moduleName := range profile.Modules.Names() {
+		if !enabled[moduleName] {
+			continue
+		}
+		module, _ := profile.Modules.Get(moduleName)
+		for _, path := range module.Paths {
+			paths = append(paths, path.Path)
+		}
+	}
+
+	port := rowInt(row, "port")
+	if port == 0 {
+		port = transport.DefaultGNMIPort
+	}
+	gnmi, err := factory(row, port)
+	if err != nil {
+		return TargetTestResult{}, false, err
+	}
+	defer func() {
+		if closer, ok := gnmi.(interface{ Close() error }); ok {
+			closer.Close()
+		}
+	}()
+
+	pathResults := []PathResult{}
+	anyFailed := false
+	for _, path := range paths {
+		updates, err := gnmi.SubscribeOnce([]string{path}, encoding(variant))
+		if err != nil {
+			pathResults = append(pathResults, PathResult{Path: path, Detail: err.Error()})
+			anyFailed = true
+			continue
+		}
+		ok := false
+		for _, update := range updates {
+			if update.Value != nil {
+				ok = true
+				break
+			}
+		}
+		result := PathResult{Path: path, OK: ok}
+		if !ok {
+			result.Detail = "no data"
+			anyFailed = true
+		}
+		pathResults = append(pathResults, result)
+	}
+	return TargetTestResult{Name: name, Ready: true, Results: pathResults}, anyFailed, nil
 }
 
 // encoding is the variant's preferred encoding; the transport imposes no

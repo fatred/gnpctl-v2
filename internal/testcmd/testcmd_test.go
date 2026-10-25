@@ -319,3 +319,34 @@ func TestRunTestMatchesGolden(t *testing.T) {
 		t.Fatalf("test output mismatch:\n got:\n%s\nwant:\n%s", got, want)
 	}
 }
+
+// closeRecorder records whether a per-target transport was closed.
+type closeRecorder struct {
+	transport.GnmiTransport
+	closed bool
+}
+
+func (c *closeRecorder) Close() error { c.closed = true; return nil }
+
+func TestTransportClosedPerTarget(t *testing.T) {
+	cat := testCatalog(t)
+	s := openTestState(t)
+	discovered(t, s, cat, "leaf1", "ports")
+	discovered(t, s, cat, "leaf2", "ports")
+	subs := fixture(map[string]map[string]any{"/interfaces": {"leaf": 1}})
+
+	var previous *closeRecorder
+	factory := func(row map[string]any, _ int) (transport.GnmiTransport, error) {
+		if previous != nil && !previous.closed {
+			t.Errorf("%v: previous target's transport still open", row["name"])
+		}
+		previous = &closeRecorder{GnmiTransport: subs}
+		return previous, nil
+	}
+	if _, _, err := RunTest(s, cat, nil, factory); err != nil {
+		t.Fatalf("RunTest: %v", err)
+	}
+	if previous == nil || !previous.closed {
+		t.Fatal("last target's transport was not closed")
+	}
+}
