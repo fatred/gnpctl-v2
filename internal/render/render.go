@@ -489,15 +489,8 @@ func Compute(
 }
 
 func discovered(row map[string]any) bool {
-	switch v := row["discovered"].(type) {
-	case int64:
-		return v != 0
-	case int:
-		return v != 0
-	case bool:
-		return v
-	}
-	return false
+	v, _ := row["discovered"].(int64)
+	return v != 0
 }
 
 // stringValue mirrors Python's row.get(key) or "", which also flattens NULL.
@@ -515,17 +508,10 @@ func optionalString(v any) *string {
 }
 
 func optionalInt(v any) *int {
-	if v == nil {
+	n, ok := v.(int64)
+	if !ok {
 		return nil
 	}
-	var n int
-	switch t := v.(type) {
-	case int64:
-		n = int(t)
-	case int:
-		n = t
-	default:
-		return nil
-	}
-	return &n
+	i := int(n)
+	return &i
 }
