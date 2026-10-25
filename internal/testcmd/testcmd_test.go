@@ -29,6 +29,8 @@ fingerprint:
 
 const testCommon = `key: vx-v1
 vendor: vx
+default_port: 6030
+platform_hints: [arista_eos]
 modules:
   ports:
     paths:
@@ -218,6 +220,38 @@ func TestTargetScoping(t *testing.T) {
 	}
 	if len(results) != 1 || results[0].Name != "leaf1" {
 		t.Fatalf("results = %+v", results)
+	}
+}
+
+func TestStoredZeroPortUsesCatalogDefault(t *testing.T) {
+	cat := testCatalog(t)
+	s := openTestState(t)
+	zero := 0
+	if err := s.UpsertTarget("leaf1", new("10.0.0.1"), &zero, new("arista_eos"), ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.EnrichTarget("leaf1", state.Enrichment{
+		Discovered: true, LastDiscoveryRun: 1, CatalogKey: "vx-v1",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.EnsureModuleColumns(cat.Modules().Names()); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetModule("leaf1", "ports", 1); err != nil {
+		t.Fatal(err)
+	}
+	subs := fixture(map[string]map[string]any{"/interfaces": {"leaf": 1}})
+	var dialled int
+	factory := func(_ map[string]any, port int) (transport.GnmiTransport, error) {
+		dialled = port
+		return subs, nil
+	}
+	if _, anyFailed, err := RunTest(s, cat, nil, factory); err != nil || anyFailed {
+		t.Fatalf("RunTest: anyFailed=%v err=%v", anyFailed, err)
+	}
+	if dialled != 6030 {
+		t.Fatalf("dialled port = %d, want 6030", dialled)
 	}
 }
 

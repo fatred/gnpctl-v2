@@ -10,7 +10,6 @@ import (
 	"github.com/fatred/gnpctl-v2/internal/catalog"
 	"github.com/fatred/gnpctl-v2/internal/pipeline"
 	"github.com/fatred/gnpctl-v2/internal/state"
-	"github.com/fatred/gnpctl-v2/internal/transport"
 )
 
 // PathResult is one subscribed path's outcome.
@@ -111,11 +110,7 @@ func testTarget(
 		}
 	}
 
-	port := rowInt(row, "port")
-	if port == 0 {
-		port = transport.DefaultGNMIPort
-	}
-	gnmi, err := factory(row, port)
+	gnmi, err := factory(row, pipeline.ResolvePort(row, cat))
 	if err != nil {
 		// One unreachable target must not hide the results of the others.
 		return TargetTestResult{Name: name, Ready: true, Results: []PathResult{{Path: "(connect)", Detail: err.Error()}}}, true, nil
@@ -166,9 +161,4 @@ func rowOSVersion(row map[string]any) *string {
 		return &s
 	}
 	return nil
-}
-
-func rowInt(row map[string]any, key string) int {
-	v, _ := row[key].(int64)
-	return int(v)
 }
