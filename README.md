@@ -51,4 +51,4 @@ Spec-driven with OpenSpec: `openspec/changes/port-to-go/`. Implementation plan: 
 
 ## License
 
-Apache License 2.0 (see `LICENSE`). You may use, modify and redistribute this software, including in commercial and corporate settings, provided you keep the license text and the attribution in `NOTICE` with any redistribution and mark files you changed. The license includes an express patent grant.
+Apache License 2.0 (see `LICENSE`); copyright held by the project maintainers (`MAINTAINERS.md`). You may use, modify and redistribute this software, including in commercial and corporate settings, provided you keep the license text and the attribution in `NOTICE` with any redistribution and mark files you changed. The license includes an express patent grant.
