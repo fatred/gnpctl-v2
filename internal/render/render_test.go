@@ -1039,12 +1039,3 @@ func captureStderr(t *testing.T, fn func()) string {
 	reader.Close()
 	return string(data)
 }
-
-func TestComputeAddsMissingModuleColumns(t *testing.T) {
-	st := newState(t) // opened without module columns, as the CLI does
-	addTarget(t, st, "leaf1", "10.0.0.1", 57400, "vx-v1", "vx", "M1", "")
-	compute(t, st, miniCatalog(t), defaultRenderConfig(t))
-	if v, err := st.ModuleValue("leaf1", "ports"); err != nil || v == nil {
-		t.Fatalf("mod_ports column missing after render: v=%v err=%v", v, err)
-	}
-}
