@@ -329,3 +329,32 @@ func TestRunDiscoveryContinuesAfterTargetError(t *testing.T) {
 		t.Fatal("leaf1 was not discovered after dead target failed")
 	}
 }
+
+// An address-less target must fail with that cause, not dial the loopback with
+// the device credentials.
+func TestAddresslessTargetRecordsNoAddressError(t *testing.T) {
+	t.Setenv("TARGET_USER", "admin")
+	t.Setenv("TARGET_PASS", "secret")
+	t.Setenv("GNMI_TLS_CA", "")
+	cat := testCatalog(t)
+	s := openTestState(t)
+	port := 57400
+	if err := s.UpsertTarget("r2", nil, &port, new(""), ""); err != nil {
+		t.Fatal(err)
+	}
+	outcome, err := DiscoverTarget(targetRow(t, s, "r2"), cat, s, DefaultTransportFactory, new(int64(1)), nil)
+	if err != nil {
+		t.Fatalf("DiscoverTarget: %v", err)
+	}
+	if outcome.Status != StatusError {
+		t.Fatalf("status = %q, want error", outcome.Status)
+	}
+	target := targetRow(t, s, "r2")
+	lastError, _ := target["last_error"].(string)
+	if !strings.Contains(lastError, "target has no address") {
+		t.Fatalf("last_error = %q, want target has no address", lastError)
+	}
+	if rowInt(t, target, "discovered") != 0 {
+		t.Fatal("address-less target marked discovered")
+	}
+}

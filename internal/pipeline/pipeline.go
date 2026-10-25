@@ -31,13 +31,17 @@ type TransportFactory func(target map[string]any, port int) (transport.GnmiTrans
 var DefaultTransportFactory TransportFactory = liveTransport
 
 func liveTransport(target map[string]any, port int) (transport.GnmiTransport, error) {
+	host := stringField(target, "address")
+	if host == "" {
+		return nil, errors.New("target has no address")
+	}
 	username := os.Getenv("TARGET_USER")
 	password := os.Getenv("TARGET_PASS")
 	if username == "" || password == "" {
 		return nil, errors.New("gNMI credentials not set — export TARGET_USER and TARGET_PASS (the device account gnpctl connects with)")
 	}
 	return transport.NewLiveTransport(
-		stringField(target, "address"), port, username, password, false, os.Getenv("GNMI_TLS_CA"),
+		host, port, username, password, false, os.Getenv("GNMI_TLS_CA"),
 	)
 }
 

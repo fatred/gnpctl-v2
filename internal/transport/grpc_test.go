@@ -348,3 +348,10 @@ func TestEveryRPCHasADeadline(t *testing.T) {
 		}
 	}
 }
+
+func TestLiveTransportRejectsEmptyHost(t *testing.T) {
+	if _, err := NewLiveTransport("", 57400, "admin", "secret", false, ""); err == nil ||
+		!strings.Contains(err.Error(), "target has no address") {
+		t.Fatalf("err = %v, want target has no address", err)
+	}
+}

@@ -52,6 +52,10 @@ var _ GnmiTransport = (*LiveTransport)(nil)
 // NewLiveTransport validates the TLS policy and prepares a lazy connection.
 // Port 0 means DefaultGNMIPort. No RPC is made until the first read.
 func NewLiveTransport(host string, port int, username, password string, skipVerify bool, tlsCA string) (*LiveTransport, error) {
+	// An empty host would dial the loopback with the device credentials.
+	if host == "" {
+		return nil, errors.New("target has no address")
+	}
 	// A CA bundle is the escape hatch used INSTEAD of disabling verification —
 	// never both. The path of least resistance for "my CA isn't trusted" must
 	// be tlsCA.
