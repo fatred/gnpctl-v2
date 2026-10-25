@@ -47,8 +47,8 @@ type LiveTransport struct {
 
 var _ GnmiTransport = (*LiveTransport)(nil)
 
-// NewLiveTransport validates the TLS policy and prepares a lazy connection.
-// Port 0 means DefaultGNMIPort. No RPC is made until the first read.
+// NewLiveTransport prepares a lazy connection; no RPC is made until the first read.
+// Callers pass a non-empty host and a resolved port.
 func NewLiveTransport(host string, port int, username, password string, tlsCA string) (*LiveTransport, error) {
 	return &LiveTransport{Host: host, Port: port, Username: username, Password: password, TLSCA: tlsCA}, nil
 }
