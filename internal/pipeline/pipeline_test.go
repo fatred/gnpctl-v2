@@ -122,12 +122,12 @@ func TestMatchedTargetEnriched(t *testing.T) {
 		t.Fatal(err)
 	}
 	tr := transport.NewFixtureTransport(nokiaCaps, nokiaSubs)
-	outcome, err := DiscoverTarget(targetRow(t, s, "leaf1"), cat, s, fixedTransport(tr, nil), new(int64(1000)), nil)
+	status, err := DiscoverTarget(targetRow(t, s, "leaf1"), cat, s, fixedTransport(tr, nil), new(int64(1000)), nil)
 	if err != nil {
 		t.Fatalf("DiscoverTarget: %v", err)
 	}
-	if outcome.Status != StatusMatched {
-		t.Fatalf("status = %q, want matched", outcome.Status)
+	if status != StatusMatched {
+		t.Fatalf("status = %q, want matched", status)
 	}
 	target := targetRow(t, s, "leaf1")
 	if got := rowInt(t, target, "discovered"); got != 1 {
@@ -163,12 +163,12 @@ func TestUnknownTargetMarkedDiscoveredNullKey(t *testing.T) {
 	tr := transport.NewFixtureTransport(map[string]any{
 		"supported_models": []map[string]any{{"name": "x", "organization": "Acme"}},
 	}, nil)
-	outcome, err := DiscoverTarget(targetRow(t, s, "mystery"), cat, s, fixedTransport(tr, nil), new(int64(5)), nil)
+	status, err := DiscoverTarget(targetRow(t, s, "mystery"), cat, s, fixedTransport(tr, nil), new(int64(5)), nil)
 	if err != nil {
 		t.Fatalf("DiscoverTarget: %v", err)
 	}
-	if outcome.Status != StatusUnknown {
-		t.Fatalf("status = %q, want unknown", outcome.Status)
+	if status != StatusUnknown {
+		t.Fatalf("status = %q, want unknown", status)
 	}
 	target := targetRow(t, s, "mystery")
 	if rowInt(t, target, "discovered") != 1 || target["catalog_key"] != nil {
@@ -193,12 +193,12 @@ func TestUnreachableTargetRecordsError(t *testing.T) {
 	boom := func(map[string]any, int) (transport.GnmiTransport, error) {
 		return nil, errors.New("connection refused")
 	}
-	outcome, err := DiscoverTarget(targetRow(t, s, "dead"), cat, s, boom, new(int64(9)), nil)
+	status, err := DiscoverTarget(targetRow(t, s, "dead"), cat, s, boom, new(int64(9)), nil)
 	if err != nil {
 		t.Fatalf("DiscoverTarget: %v", err)
 	}
-	if outcome.Status != StatusError {
-		t.Fatalf("status = %q, want error", outcome.Status)
+	if status != StatusError {
+		t.Fatalf("status = %q, want error", status)
 	}
 	target := targetRow(t, s, "dead")
 	if rowInt(t, target, "discovered") != 0 || rowInt(t, target, "last_discovery_run") != 0 {
@@ -342,12 +342,12 @@ func TestAddresslessTargetRecordsNoAddressError(t *testing.T) {
 	if err := s.UpsertTarget("r2", nil, &port, new(""), ""); err != nil {
 		t.Fatal(err)
 	}
-	outcome, err := DiscoverTarget(targetRow(t, s, "r2"), cat, s, DefaultTransportFactory, new(int64(1)), nil)
+	status, err := DiscoverTarget(targetRow(t, s, "r2"), cat, s, DefaultTransportFactory, new(int64(1)), nil)
 	if err != nil {
 		t.Fatalf("DiscoverTarget: %v", err)
 	}
-	if outcome.Status != StatusError {
-		t.Fatalf("status = %q, want error", outcome.Status)
+	if status != StatusError {
+		t.Fatalf("status = %q, want error", status)
 	}
 	target := targetRow(t, s, "r2")
 	lastError, _ := target["last_error"].(string)

@@ -27,11 +27,11 @@ func RunDiscovery(
 	}
 	counts := map[string]int{StatusMatched: 0, StatusUnknown: 0, StatusError: 0}
 	for _, row := range targets {
-		outcome, err := DiscoverTarget(row, cat, st, factory, now, report)
+		status, err := DiscoverTarget(row, cat, st, factory, now, report)
 		if err != nil {
 			return counts, err
 		}
-		counts[outcome.Status]++
+		counts[status]++
 	}
 	return counts, nil
 }
