@@ -187,6 +187,19 @@ func TestTargetsYAMLIsSeparateAndShaped(t *testing.T) {
 	}
 }
 
+func TestNonPositivePortRendersBareAddress(t *testing.T) {
+	desired := desiredConfig()
+	desired.Targets.Targets[0].Port = new(-1)
+	dir := t.TempDir()
+	if _, err := emit.Emit(dir, desired); err != nil {
+		t.Fatal(err)
+	}
+	leaf := m(t, readDoc(t, filepath.Join(dir, "targets.yaml")), "leaf1")
+	if leaf["address"] != "10.0.0.1" {
+		t.Fatalf("address = %v", leaf["address"])
+	}
+}
+
 func TestEgressYAMLShape(t *testing.T) {
 	doc := readDoc(t, filepath.Join(emitFiles(t), "egress.yaml"))
 	inp := m(t, m(t, doc, "inputs"), "vx-v1-ports")

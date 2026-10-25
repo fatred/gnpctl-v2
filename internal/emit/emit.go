@@ -123,7 +123,7 @@ func targetsDoc(desired *render.DesiredConfig) render.Ordered {
 	for _, t := range desired.Targets.Targets {
 		entry := render.Ordered{}
 		if t.Address != nil && *t.Address != "" {
-			if t.Port != nil && *t.Port != 0 {
+			if t.Port != nil && *t.Port > 0 {
 				entry.Set("address", fmt.Sprintf("%s:%d", *t.Address, *t.Port))
 			} else {
 				entry.Set("address", *t.Address)
