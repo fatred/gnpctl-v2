@@ -7,8 +7,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"math"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -117,11 +118,7 @@ func falsy(value any) bool {
 }
 
 func quotedList(set map[string]struct{}) string {
-	keys := make([]string, 0, len(set))
-	for key := range set {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(set))
 	for i, key := range keys {
 		keys[i] = pyJSONString(key)
 	}

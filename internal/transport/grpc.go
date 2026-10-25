@@ -7,10 +7,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"net"
 	"os"
 	"regexp"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -324,11 +325,7 @@ func pathString(path *gnmi.Path) string {
 	for _, elem := range path.GetElem() {
 		var b strings.Builder
 		b.WriteString(elem.GetName())
-		keys := make([]string, 0, len(elem.GetKey()))
-		for key := range elem.GetKey() {
-			keys = append(keys, key)
-		}
-		sort.Strings(keys)
+		keys := slices.Sorted(maps.Keys(elem.GetKey()))
 		for _, key := range keys {
 			fmt.Fprintf(&b, "[%s=%s]", key, elem.GetKey()[key])
 		}

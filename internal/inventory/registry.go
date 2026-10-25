@@ -4,7 +4,8 @@ package inventory
 
 import (
 	"fmt"
-	"sort"
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/fatred/gnpctl-v2/internal/inventory/sources"
@@ -17,12 +18,7 @@ type UnknownSourceType struct {
 }
 
 func (e *UnknownSourceType) Error() string {
-	available := make([]string, 0, len(sourceTypes))
-	for name := range sourceTypes {
-		available = append(available, name)
-	}
-	sort.Strings(available)
-	joined := strings.Join(available, ", ")
+	joined := strings.Join(slices.Sorted(maps.Keys(sourceTypes)), ", ")
 	return fmt.Sprintf("unknown source type '%s'; available: %s", e.Name, joined)
 }
 

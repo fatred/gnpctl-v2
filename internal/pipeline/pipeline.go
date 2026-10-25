@@ -7,8 +7,9 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"os"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -150,11 +151,7 @@ func DiscoverTarget(
 		return fail("probe", err)
 	}
 
-	models := make([]string, 0, len(profile.Models))
-	for model := range profile.Models {
-		models = append(models, model)
-	}
-	sort.Strings(models)
+	models := slices.Sorted(maps.Keys(profile.Models))
 	selection := cat.ResolveVariant(vendorMatch.Vendor, models, identity.AsDict())
 	variant := selection.Variant
 
