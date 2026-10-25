@@ -3,10 +3,10 @@ package state
 import (
 	"errors"
 	"fmt"
-	"io"
-	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/fatred/gnpctl-v2/internal/golden"
 )
 
 func newState(t *testing.T, modules ...string) *State {
@@ -384,24 +384,7 @@ var catalogModules = []string{
 }
 
 func TestOpensPythonDBAndAddsModuleColumn(t *testing.T) {
-	src, err := os.Open(filepath.Join("..", "..", "testdata", "golden", "python_state.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer src.Close()
-	dst := filepath.Join(t.TempDir(), "state.db")
-	dstFile, err := os.Create(dst)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := io.Copy(dstFile, src); err != nil {
-		t.Fatal(err)
-	}
-	if err := dstFile.Close(); err != nil {
-		t.Fatal(err)
-	}
-
-	s, err := Open(dst, append(append([]string{}, catalogModules...), "brand-new-module"))
+	s, err := Open(golden.CopyDB(t), append(append([]string{}, catalogModules...), "brand-new-module"))
 	if err != nil {
 		t.Fatalf("Open Python DB: %v", err)
 	}

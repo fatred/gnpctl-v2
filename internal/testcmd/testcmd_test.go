@@ -3,13 +3,13 @@ package testcmd
 import (
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/fatred/gnpctl-v2/internal/catalog"
+	"github.com/fatred/gnpctl-v2/internal/golden"
 	"github.com/fatred/gnpctl-v2/internal/pipeline"
 	"github.com/fatred/gnpctl-v2/internal/state"
 	"github.com/fatred/gnpctl-v2/internal/transport"
@@ -221,42 +221,6 @@ func TestTargetScoping(t *testing.T) {
 	}
 }
 
-// copyGoldenDB copies the Python-written state fixture into a temp dir so the
-// test cannot touch the checked-in file.
-func copyGoldenDB(t *testing.T) string {
-	t.Helper()
-	src, err := os.Open(filepath.Join("..", "..", "testdata", "golden", "python_state.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer src.Close()
-	dst := filepath.Join(t.TempDir(), "state.db")
-	out, err := os.Create(dst)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := io.Copy(out, src); err != nil {
-		t.Fatal(err)
-	}
-	if err := out.Close(); err != nil {
-		t.Fatal(err)
-	}
-	return dst
-}
-
-func goldenBody(t *testing.T, name string) string {
-	t.Helper()
-	data, err := os.ReadFile(filepath.Join("..", "..", "testdata", "golden", name))
-	if err != nil {
-		t.Fatal(err)
-	}
-	i := strings.IndexByte(string(data), '\n')
-	if i < 0 {
-		t.Fatalf("%s: missing exit line", name)
-	}
-	return string(data)[i+1:]
-}
-
 // everyPathFactory serves a sample for every variant path: the golden run's
 // fixture transport did the same via setdefault.
 func everyPathFactory(t *testing.T, cat *catalog.LayeredCatalog) pipeline.TransportFactory {
@@ -284,7 +248,7 @@ func TestRunTestMatchesGolden(t *testing.T) {
 	if err != nil {
 		t.Fatalf("catalog.Load: %v", err)
 	}
-	s, err := state.Open(copyGoldenDB(t), cat.Modules().Names())
+	s, err := state.Open(golden.CopyDB(t), cat.Modules().Names())
 	if err != nil {
 		t.Fatalf("state.Open: %v", err)
 	}
@@ -316,7 +280,7 @@ func TestRunTestMatchesGolden(t *testing.T) {
 			fmt.Fprintf(&out, "%s %s: %s%s\n", result.Name, path.Path, status, detail)
 		}
 	}
-	if got, want := out.String(), goldenBody(t, "test.txt"); got != want {
+	if got, want := out.String(), golden.Body(t, "test.txt"); got != want {
 		t.Fatalf("test output mismatch:\n got:\n%s\nwant:\n%s", got, want)
 	}
 }

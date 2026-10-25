@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/fatred/gnpctl-v2/internal/golden"
 	"github.com/fatred/gnpctl-v2/internal/inventory/sources"
 	"github.com/fatred/gnpctl-v2/internal/state"
 )
@@ -383,19 +384,6 @@ func targetNames(t *testing.T, rows []map[string]any) []string {
 	return names
 }
 
-func goldenBody(t *testing.T, name string) string {
-	t.Helper()
-	raw, err := os.ReadFile(filepath.Join("..", "..", "testdata", "golden", name))
-	if err != nil {
-		t.Fatalf("read golden: %v", err)
-	}
-	body := strings.SplitN(string(raw), "\n", 2)
-	if len(body) != 2 {
-		t.Fatalf("golden %s has no output body", name)
-	}
-	return body[1]
-}
-
 func TestFormatTableMatchesGoldenShow(t *testing.T) {
 	rows := []map[string]any{
 		{
@@ -410,7 +398,7 @@ func TestFormatTableMatchesGoldenShow(t *testing.T) {
 			"os_version": "4.33.4M", "catalog_key": "arista-eos", "last_error": nil,
 		},
 	}
-	want := goldenBody(t, "inv_show.txt")
+	want := golden.Body(t, "inv_show.txt")
 	if got := FormatTable(rows) + "\n"; got != want {
 		t.Fatalf("table mismatch\ngot:\n%q\nwant:\n%q", got, want)
 	}
@@ -429,14 +417,14 @@ func TestFormatTableMatchesGoldenShowUndiscovered(t *testing.T) {
 			"os_version": nil, "catalog_key": nil, "last_error": nil,
 		},
 	}
-	want := goldenBody(t, "inv_show_undiscovered.txt")
+	want := golden.Body(t, "inv_show_undiscovered.txt")
 	if got := FormatTable(rows) + "\n"; got != want {
 		t.Fatalf("table mismatch\ngot:\n%q\nwant:\n%q", got, want)
 	}
 }
 
 func TestFormatDiffMatchesGolden(t *testing.T) {
-	want := goldenBody(t, "inv_diff_before.txt")
+	want := golden.Body(t, "inv_diff_before.txt")
 	got := FormatDiff(DiffResult{Added: []string{"leaf1", "spine1"}}) + "\n"
 	if got != want {
 		t.Fatalf("diff mismatch\ngot:\n%q\nwant:\n%q", got, want)

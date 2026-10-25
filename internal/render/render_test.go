@@ -13,6 +13,7 @@ import (
 	"github.com/fatred/gnpctl-v2/internal/catalog"
 	"github.com/fatred/gnpctl-v2/internal/config"
 	"github.com/fatred/gnpctl-v2/internal/emit"
+	"github.com/fatred/gnpctl-v2/internal/golden"
 	"github.com/fatred/gnpctl-v2/internal/render"
 	"github.com/fatred/gnpctl-v2/internal/state"
 	"gopkg.in/yaml.v3"
@@ -835,15 +836,7 @@ func federateState(t *testing.T) *state.State {
 func TestGoldenRenderSemantic(t *testing.T) {
 	cat := realCatalog(t)
 	goldenDir := filepath.Join("..", "..", "testdata", "golden")
-	dbSource := filepath.Join(goldenDir, "python_state.db")
-	dbCopy := filepath.Join(t.TempDir(), "state.db")
-	data, err := os.ReadFile(dbSource)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(dbCopy, data, 0o644); err != nil {
-		t.Fatal(err)
-	}
+	dbCopy := golden.CopyDB(t)
 	cfgPath := filepath.Join(t.TempDir(), "gnpctl.yaml")
 	cfgText := "database: " + dbCopy + "\n" +
 		"catalog: " + filepath.Join("..", "..", "catalog") + "\n" +

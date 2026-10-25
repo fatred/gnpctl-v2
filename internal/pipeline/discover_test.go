@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/fatred/gnpctl-v2/internal/catalog"
+	"github.com/fatred/gnpctl-v2/internal/golden"
 	"github.com/fatred/gnpctl-v2/internal/inventory"
 	"github.com/fatred/gnpctl-v2/internal/state"
 	"github.com/fatred/gnpctl-v2/internal/transport"
@@ -64,19 +65,6 @@ func e2eFactory(t *testing.T, cat *catalog.LayeredCatalog) TransportFactory {
 	}
 }
 
-func goldenBody(t *testing.T, name string) string {
-	t.Helper()
-	data, err := os.ReadFile(filepath.Join("..", "..", "testdata", "golden", name))
-	if err != nil {
-		t.Fatalf("read golden: %v", err)
-	}
-	i := strings.IndexByte(string(data), '\n')
-	if i < 0 {
-		t.Fatalf("%s: missing exit line", name)
-	}
-	return string(data)[i+1:]
-}
-
 func TestDiscoverMatchesGolden(t *testing.T) {
 	cat := testCatalog(t)
 	s := openTestState(t)
@@ -96,7 +84,7 @@ func TestDiscoverMatchesGolden(t *testing.T) {
 	}
 	fmt.Fprintf(&out, "matched=%d unknown=%d error=%d\n",
 		counts[StatusMatched], counts[StatusUnknown], counts[StatusError])
-	if got, want := out.String(), goldenBody(t, "discover.txt"); got != want {
+	if got, want := out.String(), golden.Body(t, "discover.txt"); got != want {
 		t.Fatalf("discover output mismatch:\n got:\n%s\nwant:\n%s", got, want)
 	}
 
