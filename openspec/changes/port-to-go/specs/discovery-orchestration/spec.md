@@ -13,15 +13,21 @@ catalog key, resolve make/model/version via the entry's detail probes, and enric
 ### Requirement: Effective gNMI port resolution
 
 When connecting to a target, discover SHALL determine the effective port with the precedence:
-(1) the target's port if set; (2) the `default_port` of the catalog entry whose `platform_hints`
-include the target's platform hint; (3) the global default gNMI port `57400` (the gNMI convention,
+(1) the target's port if set and positive (a stored value <= 0 counts as unset); (2) the
+`default_port` of the catalog entry whose `platform_hints` include the target's platform hint;
+(3) the global default gNMI port `57400` (the gNMI convention,
 matching gnmic). Because the transport (the gNMI client library) applies no default of its own, discover SHALL always
 pass an explicit port and SHALL persist the resolved port on the target row.
 
 #### Scenario: Explicit target port is used
 
-- **WHEN** a selected target already has a port set (e.g. from a NetBox application Service)
+- **WHEN** a selected target already has a positive port set (e.g. from a NetBox application Service)
 - **THEN** discover connects on that port and does not override it
+
+#### Scenario: Stored non-positive port falls back to the catalog default
+
+- **WHEN** a selected target's stored port is `0` (or negative) and its platform hint maps to a catalog entry with `default_port: 6030`
+- **THEN** discover treats the stored port as unset, connects on 6030, and persists 6030
 
 #### Scenario: Vendor default applied by platform hint
 
