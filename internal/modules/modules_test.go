@@ -2,13 +2,13 @@ package modules
 
 import (
 	"errors"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/fatred/gnpctl-v2/internal/catalog"
+	"github.com/fatred/gnpctl-v2/internal/golden"
 	"github.com/fatred/gnpctl-v2/internal/state"
 )
 
@@ -204,48 +204,12 @@ func TestUnknownModuleAndTargetErrors(t *testing.T) {
 	}
 }
 
-// copyGoldenDB copies the Python-written state fixture into a temp dir so
-// EnsureModuleColumns cannot touch the checked-in file.
-func copyGoldenDB(t *testing.T) string {
-	t.Helper()
-	src, err := os.Open(filepath.Join("..", "..", "testdata", "golden", "python_state.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer src.Close()
-	dst := filepath.Join(t.TempDir(), "state.db")
-	out, err := os.Create(dst)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := io.Copy(out, src); err != nil {
-		t.Fatal(err)
-	}
-	if err := out.Close(); err != nil {
-		t.Fatal(err)
-	}
-	return dst
-}
-
-func goldenBody(t *testing.T, name string) string {
-	t.Helper()
-	data, err := os.ReadFile(filepath.Join("..", "..", "testdata", "golden", name))
-	if err != nil {
-		t.Fatal(err)
-	}
-	i := strings.IndexByte(string(data), '\n')
-	if i < 0 {
-		t.Fatalf("%s: missing exit line", name)
-	}
-	return string(data)[i+1:]
-}
-
 func TestFormatModulesMatchesGolden(t *testing.T) {
 	cat, err := catalog.Load(filepath.Join("..", "..", "catalog"))
 	if err != nil {
 		t.Fatalf("catalog.Load: %v", err)
 	}
-	s, err := state.Open(copyGoldenDB(t), cat.Modules().Names())
+	s, err := state.Open(golden.CopyDB(t), cat.Modules().Names())
 	if err != nil {
 		t.Fatalf("state.Open: %v", err)
 	}
@@ -259,7 +223,7 @@ func TestFormatModulesMatchesGolden(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := FormatModules(rows)+"\n", goldenBody(t, "modules_show.txt"); got != want {
+	if got, want := FormatModules(rows)+"\n", golden.Body(t, "modules_show.txt"); got != want {
 		t.Fatalf("modules show mismatch:\n got:\n%s\nwant:\n%s", got, want)
 	}
 
@@ -271,7 +235,7 @@ func TestFormatModulesMatchesGolden(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := FormatModules(rows)+"\n", goldenBody(t, "modules_show_after.txt"); got != want {
+	if got, want := FormatModules(rows)+"\n", golden.Body(t, "modules_show_after.txt"); got != want {
 		t.Fatalf("modules show after mismatch:\n got:\n%s\nwant:\n%s", got, want)
 	}
 }
