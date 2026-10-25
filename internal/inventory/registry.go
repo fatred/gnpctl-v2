@@ -23,9 +23,6 @@ func (e *UnknownSourceType) Error() string {
 	}
 	sort.Strings(available)
 	joined := strings.Join(available, ", ")
-	if joined == "" {
-		joined = "(none)"
-	}
 	return fmt.Sprintf("unknown source type '%s'; available: %s", e.Name, joined)
 }
 
@@ -50,33 +47,6 @@ var sourceTypes = map[string]SourceType{
 	},
 }
 
-// Lookup resolves a source-type name to its built-in registration.
-func Lookup(typeName string) (SourceType, error) {
-	sourceType, ok := sourceTypes[typeName]
-	if !ok {
-		return SourceType{}, &UnknownSourceType{Name: typeName}
-	}
-	return sourceType, nil
-}
-
-// ValidateParams validates params against the named source type.
-func ValidateParams(typeName string, params map[string]string, credentialRef string) error {
-	sourceType, err := Lookup(typeName)
-	if err != nil {
-		return err
-	}
-	return sourceType.Validate(params, credentialRef)
-}
-
-// Instantiate builds a source instance for the named source type.
-func Instantiate(typeName string, params map[string]string, credentialRef string) (sources.Source, error) {
-	sourceType, err := Lookup(typeName)
-	if err != nil {
-		return nil, err
-	}
-	return sourceType.New(params, credentialRef), nil
-}
-
 // InstantiateSource builds a source instance from a stored inventory_sources
 // row.
 func InstantiateSource(row map[string]any) (sources.Source, error) {
@@ -92,13 +62,21 @@ func InstantiateSource(row map[string]any) (sources.Source, error) {
 			}
 		}
 	}
-	return Instantiate(typeName, params, credentialRef)
+	sourceType, ok := sourceTypes[typeName]
+	if !ok {
+		return nil, &UnknownSourceType{Name: typeName}
+	}
+	return sourceType.New(params, credentialRef), nil
 }
 
 // AddSource validates the type and params against the source class, then
 // persists the source.
 func AddSource(st *state.State, name, typeName string, params map[string]string, credentialRef string) error {
-	if err := ValidateParams(typeName, params, credentialRef); err != nil {
+	sourceType, ok := sourceTypes[typeName]
+	if !ok {
+		return &UnknownSourceType{Name: typeName}
+	}
+	if err := sourceType.Validate(params, credentialRef); err != nil {
 		return err
 	}
 	anyParams := make(map[string]any, len(params))
