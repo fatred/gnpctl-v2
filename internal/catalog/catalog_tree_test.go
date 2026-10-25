@@ -253,6 +253,18 @@ func TestInvalidModeRejected(t *testing.T) {
 		"common.yaml", "modules.ports.paths.0.mode", "invalid mode 'streaming'")
 }
 
+func TestZeroDefaultPortRejected(t *testing.T) {
+	bad := strings.Replace(srlinuxCommon, "default_port: 57400", "default_port: 0", 1)
+	wantLoadError(t, fullTree(t, map[string]string{"nokia/srlinux/common.yaml": bad}),
+		"common.yaml", "default_port", "positive")
+}
+
+func TestNegativeDefaultPortRejected(t *testing.T) {
+	bad := strings.Replace(srlinuxCommon, "default_port: 57400", "default_port: -1", 1)
+	wantLoadError(t, fullTree(t, map[string]string{"nokia/srlinux/common.yaml": bad}),
+		"common.yaml", "default_port", "positive")
+}
+
 func TestLegacyFlatEntryRejected(t *testing.T) {
 	flat := "key: old\nvendor: nokia\nsubscription:\n  - {path: /x, mode: sample}\n"
 	wantLoadError(t, fullTree(t, map[string]string{"legacy.yaml": flat}), "legacy")

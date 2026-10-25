@@ -39,6 +39,7 @@ Commands, flags and the config file are the same as the Python version (cobra ad
 - Config/catalog validation messages keep file, field and message but drop pydantic's `[type=…]` suffix and URL.
 - Duplicate YAML keys in config/catalog files are an error.
 - Catalog probe `pattern`s use Go RE2 syntax (no lookaround or backreferences); an incompatible pattern is a catalog load error naming the file and rule.
+- Catalog `default_port` must be greater than zero (Python loads non-positive values); `gnpctl test` dials the same resolved port as `discover`, not the raw stored row port; `render` still passes the stored row port through, so re-run `discover` after an `inventory pull` that changes a port.
 
 Not ported: the `hwtest/` YANG-facts and hardware-capture harness (stays in the Python repo; the Go port only reads `catalog/yang`).
 

@@ -223,6 +223,18 @@ func TestPortResolutionExplicitVendorDefaultGlobal(t *testing.T) {
 	}
 }
 
+func TestPortResolutionNonPositiveFallsBack(t *testing.T) {
+	cat := testCatalog(t)
+	for _, port := range []any{int64(0), int64(-1)} {
+		if got := ResolvePort(map[string]any{"port": port, "platform_hint": "arista_eos"}, cat); got != 6030 {
+			t.Fatalf("stored port %v = %d, want 6030", port, got)
+		}
+	}
+	if got := ResolvePort(map[string]any{"port": int64(0), "platform_hint": "unknownos"}, cat); got != transport.DefaultGNMIPort {
+		t.Fatalf("no usable hint = %d, want 57400", got)
+	}
+}
+
 func TestPortPersistedFromVendorDefault(t *testing.T) {
 	cat := testCatalog(t)
 	s := openTestState(t)
