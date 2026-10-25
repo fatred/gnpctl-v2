@@ -223,6 +223,15 @@ func TestPortResolutionExplicitVendorDefaultGlobal(t *testing.T) {
 	}
 }
 
+func TestPortResolutionNonPositiveFallsBack(t *testing.T) {
+	cat := testCatalog(t)
+	for _, port := range []any{int64(0), int64(-1)} {
+		if got := ResolvePort(map[string]any{"port": port, "platform_hint": "nokia_srl"}, cat); got != 57400 {
+			t.Fatalf("stored port %v = %d, want 57400", port, got)
+		}
+	}
+}
+
 func TestPortPersistedFromVendorDefault(t *testing.T) {
 	cat := testCatalog(t)
 	s := openTestState(t)
