@@ -106,6 +106,9 @@ func TestUnknownTypeRejected(t *testing.T) {
 	if !errors.As(err, &unknown) {
 		t.Fatalf("err = %v, want *UnknownSourceType", err)
 	}
+	if msg := err.Error(); msg != "unknown source type 'does-not-exist'; available: netbox, nornir" {
+		t.Fatalf("msg = %q", msg)
+	}
 }
 
 func TestMissingRequiredParamRejected(t *testing.T) {
