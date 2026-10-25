@@ -6,7 +6,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"sort"
+	"maps"
+	"slices"
 	"strings"
 	"time"
 
@@ -321,11 +322,7 @@ func Enabled(row map[string]any, names []string) []string {
 // default; operator pins (-1 force-off / 2 force-on) are preserved. All updates
 // commit together, as Python's single commit does.
 func (s *State) ReconcileModules(target string, defaults map[string]int) error {
-	names := make([]string, 0, len(defaults))
-	for name := range defaults {
-		names = append(names, name)
-	}
-	sort.Strings(names)
+	names := slices.Sorted(maps.Keys(defaults))
 	tx, err := s.db.Begin()
 	if err != nil {
 		return err
