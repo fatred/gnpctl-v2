@@ -213,3 +213,37 @@ func TestNetBoxDoesNotFollowRedirects(t *testing.T) {
 		t.Fatal("followed the redirect and re-sent the API token")
 	}
 }
+
+// A pasted token in --token-env must be rejected without echoing it: the value
+// would otherwise be stored in inventory_sources.credential_ref and printed.
+func TestValidateRejectsCredentialRefThatLooksLikeAToken(t *testing.T) {
+	const pasted = "9f8e7d6c5b4a39281706f5e4d3c2b1a09f8e7d6c" // NetBox token shape: starts with a digit
+	err := ValidateNetBoxParams(map[string]string{"url": "https://nb", "tag": "t"}, pasted)
+	var sourceErr *SourceError
+	if !errors.As(err, &sourceErr) {
+		t.Fatalf("err = %v, want *SourceError", err)
+	}
+	if strings.Contains(sourceErr.Msg, pasted) {
+		t.Fatalf("msg echoes the credential value: %q", sourceErr.Msg)
+	}
+	if !strings.Contains(sourceErr.Msg, "environment variable") {
+		t.Fatalf("msg = %q", sourceErr.Msg)
+	}
+}
+
+// Defensive: even when validation is bypassed (a row written by hand), the
+// token-name error must not echo a value that is not an identifier.
+func TestNetBoxTokenErrorDoesNotEchoNonIdentifierRef(t *testing.T) {
+	const pasted = "9f8e7d6c5b4a39281706f5e4d3c2b1a09f8e7d6c" // NetBox token shape: starts with a digit
+	_, err := (&NetBoxSource{
+		Params:        map[string]string{"url": "https://nb", "tag": "t"},
+		CredentialRef: pasted,
+	}).Fetch()
+	var sourceErr *SourceError
+	if !errors.As(err, &sourceErr) {
+		t.Fatalf("err = %v, want *SourceError", err)
+	}
+	if strings.Contains(sourceErr.Msg, pasted) {
+		t.Fatalf("msg echoes the credential value: %q", sourceErr.Msg)
+	}
+}
