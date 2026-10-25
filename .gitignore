@@ -3,3 +3,10 @@
 *.db
 *.db-shm
 *.db-wal
+.env
+.env.*
+go.work
+go.work.sum
+*.test
+*.out
+coverage.*
