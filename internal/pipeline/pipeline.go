@@ -250,14 +250,10 @@ func intField(row map[string]any, key string) int {
 // text renders an optional probe value the way the Python code stores it in a
 // text column (nil -> unset).
 func text(value any) string {
-	switch v := value.(type) {
-	case nil:
+	if value == nil {
 		return ""
-	case string:
-		return v
-	default:
-		return fmt.Sprint(v)
 	}
+	return fmt.Sprint(value)
 }
 
 func joinNonEmpty(parts ...string) string {

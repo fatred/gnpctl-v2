@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -203,16 +202,8 @@ func newInventoryShowCmd(app *appContext) *cobra.Command {
 // rowText renders a DB value the way Python prints it: text as-is, integers in
 // decimal, NULL as empty.
 func rowText(row map[string]any, key string) string {
-	switch value := row[key].(type) {
-	case nil:
-		return ""
-	case string:
-		return value
-	case int64:
-		return strconv.FormatInt(value, 10)
-	case int:
-		return strconv.Itoa(value)
-	default:
+	if value := row[key]; value != nil {
 		return fmt.Sprint(value)
 	}
+	return ""
 }
