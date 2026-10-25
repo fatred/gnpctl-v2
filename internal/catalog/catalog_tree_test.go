@@ -529,3 +529,9 @@ func TestDuplicateVariantKeyAcrossVendorsNamesBothFiles(t *testing.T) {
 		"duplicate variant key 'nokia-srlinux'",
 		"juniper/dupe/common.yaml", "nokia/srlinux/common.yaml")
 }
+
+func TestPythonOnlyProbeRegexRejectedAtLoad(t *testing.T) {
+	vendor := strings.Replace(juniperVendor, `'^(?:RE-)?(?P<model>.+)$'`, `'(?<=RE-)(?P<model>.+)$'`, 1)
+	dir := fullTree(t, map[string]string{"juniper/vendor.yaml": vendor})
+	wantLoadError(t, dir, "platform_probe.parse.0.pattern", "RE2")
+}
