@@ -66,14 +66,9 @@ const (
 	StatusError   = "error"
 )
 
-// DiscoverOutcome is one target's discovery result.
-type DiscoverOutcome struct {
-	Status string
-}
-
 // DiscoverTarget discovers one target. Transport/probe errors are recorded on
-// the target and returned in the outcome; only state-store errors are returned
-// as err. report (optional) receives the progress lines.
+// the target and reported as a StatusError status; only state-store errors are
+// returned as err. report (optional) receives the progress lines.
 func DiscoverTarget(
 	target map[string]any,
 	cat *catalog.LayeredCatalog,
@@ -81,7 +76,7 @@ func DiscoverTarget(
 	factory TransportFactory,
 	now *int64,
 	report io.Writer,
-) (DiscoverOutcome, error) {
+) (string, error) {
 	name := stringField(target, "name")
 	timestamp := time.Now().Unix()
 	if now != nil {
@@ -89,21 +84,21 @@ func DiscoverTarget(
 	}
 	port := ResolvePort(target, cat)
 	if err := st.SetTargetPort(name, port); err != nil {
-		return DiscoverOutcome{Status: StatusError}, err
+		return StatusError, err
 	}
 	if err := st.EnsureModuleColumns(cat.Modules().Names()); err != nil {
-		return DiscoverOutcome{Status: StatusError}, err
+		return StatusError, err
 	}
 	say(report, fmt.Sprintf("Fingerprinting %s", name))
 
-	fail := func(phase string, cause error) (DiscoverOutcome, error) {
+	fail := func(phase string, cause error) (string, error) {
 		message := describe(cause)
 		slog.Warn(fmt.Sprintf("discover %s: %s error: %s", name, phase, message))
 		if err := st.RecordTargetError(name, errors.New(message)); err != nil {
-			return DiscoverOutcome{Status: StatusError}, err
+			return StatusError, err
 		}
 		say(report, fmt.Sprintf("%s: error: %s", name, message))
-		return DiscoverOutcome{Status: StatusError}, nil
+		return StatusError, nil
 	}
 
 	gnmi, err := factory(target, port)
@@ -131,13 +126,13 @@ func DiscoverTarget(
 			CapabilitiesHash: profile.Hash(),
 			Port:             &port,
 		}); err != nil {
-			return DiscoverOutcome{Status: StatusUnknown}, err
+			return StatusUnknown, err
 		}
 		if err := st.ReconcileModules(name, moduleDefaults(cat, nil)); err != nil {
-			return DiscoverOutcome{Status: StatusUnknown}, err
+			return StatusUnknown, err
 		}
 		say(report, fmt.Sprintf("%s: vendor not recognised", name))
-		return DiscoverOutcome{Status: StatusUnknown}, nil
+		return StatusUnknown, nil
 	}
 
 	say(report, fmt.Sprintf("%s is %s, getting make/version", name, vendorMatch.Vendor))
@@ -171,7 +166,7 @@ func DiscoverTarget(
 		CapabilitiesHash: profile.Hash(),
 		Port:             &port,
 	}); err != nil {
-		return DiscoverOutcome{Status: StatusError}, err
+		return StatusError, err
 	}
 
 	var effective *catalog.EffectiveProfile
@@ -182,20 +177,20 @@ func DiscoverTarget(
 		}
 		effective, err = cat.EffectiveProfile(variant.Key, versionPtr)
 		if err != nil {
-			return DiscoverOutcome{Status: StatusError}, err
+			return StatusError, err
 		}
 	}
 	if err := st.ReconcileModules(name, moduleDefaults(cat, effective)); err != nil {
-		return DiscoverOutcome{Status: StatusError}, err
+		return StatusError, err
 	}
 
 	descr := joinNonEmpty(identity.Vendor, text(identity.Model), osVersion)
 	if variant == nil {
 		say(report, fmt.Sprintf("%s is %s (no catalog variant)", name, descr))
-		return DiscoverOutcome{Status: StatusUnknown}, nil
+		return StatusUnknown, nil
 	}
 	say(report, fmt.Sprintf("%s is %s", name, descr))
-	return DiscoverOutcome{Status: StatusMatched}, nil
+	return StatusMatched, nil
 }
 
 // describe is a non-empty error string — some transport/gRPC errors stringify
