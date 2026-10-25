@@ -1,6 +1,7 @@
 /gnpctl
 /bin/
 *.db
+!testdata/golden/*.db
 *.db-shm
 *.db-wal
 .env
