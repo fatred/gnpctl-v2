@@ -41,7 +41,7 @@ func newRenderCmd(app *appContext) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			paths, err := emit.NewFileEmitter(outDir).Emit(desired)
+			paths, err := emit.Emit(outDir, desired)
 			if err != nil {
 				return err
 			}

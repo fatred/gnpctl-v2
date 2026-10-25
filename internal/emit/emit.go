@@ -25,18 +25,10 @@ const SkipVerifyBanner = "# ====================================================
 	"# Prefer `render.gnmic.tls_ca: <ca-bundle>` to pin a private CA instead.\n" +
 	"# ============================================================================\n"
 
-// FileEmitter serializes a DesiredConfig to ingress.yaml / egress.yaml /
-// targets.yaml under OutputDir.
-type FileEmitter struct {
-	OutputDir string
-}
-
-// NewFileEmitter returns a FileEmitter writing to dir.
-func NewFileEmitter(dir string) *FileEmitter { return &FileEmitter{OutputDir: dir} }
-
-// Emit writes the three artifacts in Python's order and returns their paths.
-func (e *FileEmitter) Emit(desired *render.DesiredConfig) ([]string, error) {
-	if err := os.MkdirAll(e.OutputDir, 0o777); err != nil {
+// Emit serializes a DesiredConfig to ingress.yaml / egress.yaml / targets.yaml
+// under dir, in Python's order, and returns their paths.
+func Emit(dir string, desired *render.DesiredConfig) ([]string, error) {
+	if err := os.MkdirAll(dir, 0o777); err != nil {
 		return nil, err
 	}
 	artifacts := []struct {
@@ -49,7 +41,7 @@ func (e *FileEmitter) Emit(desired *render.DesiredConfig) ([]string, error) {
 	}
 	written := make([]string, 0, len(artifacts))
 	for _, artifact := range artifacts {
-		path := filepath.Join(e.OutputDir, artifact.name)
+		path := filepath.Join(dir, artifact.name)
 		text, err := dump(artifact.doc)
 		if err != nil {
 			return nil, err

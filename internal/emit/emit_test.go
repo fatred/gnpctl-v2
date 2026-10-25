@@ -93,7 +93,7 @@ func desiredConfig() *render.DesiredConfig {
 func emitFiles(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
-	if _, err := emit.NewFileEmitter(dir).Emit(desiredConfig()); err != nil {
+	if _, err := emit.Emit(dir, desiredConfig()); err != nil {
 		t.Fatal(err)
 	}
 	return dir
@@ -123,7 +123,7 @@ func m(t *testing.T, parent map[string]any, key string) map[string]any {
 
 func TestEmitsThreeFiles(t *testing.T) {
 	dir := t.TempDir()
-	written, err := emit.NewFileEmitter(dir).Emit(desiredConfig())
+	written, err := emit.Emit(dir, desiredConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -237,7 +237,7 @@ func TestStringTrueStaysString(t *testing.T) {
 			return processors
 		}(),
 	}}
-	if _, err := emit.NewFileEmitter(dir).Emit(desired); err != nil {
+	if _, err := emit.Emit(dir, desired); err != nil {
 		t.Fatal(err)
 	}
 	got := m(t, m(t, readDoc(t, filepath.Join(dir, "egress.yaml")), "processors"), "p")
@@ -254,7 +254,7 @@ func TestScalarsRoundTrip(t *testing.T) {
 	processors.Set("round-trip", spec)
 	dir := t.TempDir()
 	desired := &render.DesiredConfig{Egress: render.EgressConfig{Processors: processors}}
-	if _, err := emit.NewFileEmitter(dir).Emit(desired); err != nil {
+	if _, err := emit.Emit(dir, desired); err != nil {
 		t.Fatal(err)
 	}
 	got := m(t, m(t, readDoc(t, filepath.Join(dir, "egress.yaml")), "processors"), "round-trip")

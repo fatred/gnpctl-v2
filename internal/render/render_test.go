@@ -451,7 +451,7 @@ func TestTargetNamedByFQDNAndAddressKeepsIP(t *testing.T) {
 		target.Port == nil || *target.Port != 57400 {
 		t.Fatalf("address = %v port = %v", target.Address, target.Port)
 	}
-	if _, err := emit.NewFileEmitter(t.TempDir()).Emit(desired); err != nil {
+	if _, err := emit.Emit(t.TempDir(), desired); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -501,7 +501,7 @@ func TestSkipVerifyRenderWarnsAndBanners(t *testing.T) {
 	desired := compute(t, miniState(t), miniCatalog(t), skipVerifyRenderConfig(t))
 	dir := t.TempDir()
 	stderr := captureStderr(t, func() {
-		if _, err := emit.NewFileEmitter(dir).Emit(desired); err != nil {
+		if _, err := emit.Emit(dir, desired); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -522,7 +522,7 @@ func TestSecureRenderEmitsNoTLSWarning(t *testing.T) {
 	desired := compute(t, miniState(t), miniCatalog(t), defaultRenderConfig(t))
 	dir := t.TempDir()
 	stderr := captureStderr(t, func() {
-		if _, err := emit.NewFileEmitter(dir).Emit(desired); err != nil {
+		if _, err := emit.Emit(dir, desired); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -579,7 +579,7 @@ func TestPortsSliceGoldenRenderRealCatalog(t *testing.T) {
 		t.Fatal("gnpctl-meta spec missing")
 	}
 	dir := t.TempDir()
-	if _, err := emit.NewFileEmitter(dir).Emit(desired); err != nil {
+	if _, err := emit.Emit(dir, desired); err != nil {
 		t.Fatal(err)
 	}
 	ingress := readYAML(t, filepath.Join(dir, "ingress.yaml"))
@@ -857,7 +857,7 @@ func TestGoldenRenderSemantic(t *testing.T) {
 
 	desired := compute(t, st, cat, cfg.Render)
 	outDir := t.TempDir()
-	if _, err := emit.NewFileEmitter(outDir).Emit(desired); err != nil {
+	if _, err := emit.Emit(outDir, desired); err != nil {
 		t.Fatal(err)
 	}
 	for _, name := range []string{"ingress.yaml", "targets.yaml", "egress.yaml"} {
