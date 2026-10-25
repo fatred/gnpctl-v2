@@ -55,7 +55,7 @@ func RunTest(
 			return nil, false, err
 		}
 		for _, row := range rows {
-			if discovered := row["discovered"]; discovered == int64(1) || discovered == 1 {
+			if discovered := row["discovered"]; discovered == int64(1) {
 				targets = append(targets, row)
 			}
 		}
@@ -169,11 +169,6 @@ func rowOSVersion(row map[string]any) *string {
 }
 
 func rowInt(row map[string]any, key string) int {
-	switch v := row[key].(type) {
-	case int64:
-		return int(v)
-	case int:
-		return v
-	}
-	return 0
+	v, _ := row[key].(int64)
+	return int(v)
 }

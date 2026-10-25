@@ -238,13 +238,8 @@ func stringField(row map[string]any, key string) string {
 }
 
 func intField(row map[string]any, key string) int {
-	switch v := row[key].(type) {
-	case int64:
-		return int(v)
-	case int:
-		return v
-	}
-	return 0
+	v, _ := row[key].(int64)
+	return int(v)
 }
 
 // text renders an optional probe value the way the Python code stores it in a
