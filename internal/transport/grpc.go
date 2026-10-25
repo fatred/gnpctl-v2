@@ -15,12 +15,18 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/openconfig/gnmi/proto/gnmi"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
 )
+
+// rpcTimeout bounds every RPC and the Subscribe stream's Recv so a device that
+// accepts the connection but never answers becomes a per-target error, not a
+// hang. A var (not a const) only so the tests can shorten it.
+var rpcTimeout = 30 * time.Second
 
 // LiveTransport is the gRPC gNMI transport.
 //
@@ -123,6 +129,11 @@ func (t *LiveTransport) context() context.Context {
 	return ctx
 }
 
+// rpcContext is one RPC's context: the credential metadata plus the deadline.
+func (t *LiveTransport) rpcContext() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(t.context(), rpcTimeout)
+}
+
 func (t *LiveTransport) grpcError(err error) error {
 	return fmt.Errorf("GRPC ERROR Host: %s, Error: %v", t.addr(), err)
 }
@@ -132,7 +143,9 @@ func (t *LiveTransport) Capabilities() (map[string]any, error) {
 	if err != nil {
 		return nil, t.grpcError(err)
 	}
-	resp, err := client.Capabilities(t.context(), &gnmi.CapabilityRequest{})
+	ctx, cancel := t.rpcContext()
+	defer cancel()
+	resp, err := client.Capabilities(ctx, &gnmi.CapabilityRequest{})
 	if err != nil {
 		return nil, t.grpcError(err)
 	}
@@ -172,6 +185,8 @@ func (t *LiveTransport) SubscribeOnce(paths []string, encoding string) ([]LeafUp
 	if err != nil {
 		return nil, t.grpcError(err)
 	}
+	ctx, cancel := t.rpcContext()
+	defer cancel()
 	subs := make([]*gnmi.Subscription, 0, len(paths))
 	for _, p := range paths {
 		subs = append(subs, &gnmi.Subscription{Path: parsePath(p)})
@@ -186,7 +201,7 @@ func (t *LiveTransport) SubscribeOnce(paths []string, encoding string) ([]LeafUp
 		},
 	}
 
-	stream, err := client.Subscribe(t.context())
+	stream, err := client.Subscribe(ctx)
 	if err != nil {
 		return nil, t.grpcError(err)
 	}
