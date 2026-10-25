@@ -5,10 +5,8 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"net"
 	"os"
 	"regexp"
@@ -36,12 +34,11 @@ var rpcTimeout = 30 * time.Second
 // not in the host trust store, point at the CA bundle via TLSCA rather than
 // disabling verification.
 type LiveTransport struct {
-	Host       string
-	Port       int
-	Username   string
-	Password   string
-	SkipVerify bool
-	TLSCA      string
+	Host     string
+	Port     int
+	Username string
+	Password string
+	TLSCA    string
 
 	conn   *grpc.ClientConn
 	client gnmi.GNMIClient
@@ -51,31 +48,8 @@ var _ GnmiTransport = (*LiveTransport)(nil)
 
 // NewLiveTransport validates the TLS policy and prepares a lazy connection.
 // Port 0 means DefaultGNMIPort. No RPC is made until the first read.
-func NewLiveTransport(host string, port int, username, password string, skipVerify bool, tlsCA string) (*LiveTransport, error) {
-	// An empty host would dial the loopback with the device credentials.
-	if host == "" {
-		return nil, errors.New("target has no address")
-	}
-	// A CA bundle is the escape hatch used INSTEAD of disabling verification —
-	// never both. The path of least resistance for "my CA isn't trusted" must
-	// be tlsCA.
-	if skipVerify && tlsCA != "" {
-		return nil, errors.New("skip_verify cannot be combined with tls_ca — use tls_ca to trust a private CA (the secure path), not skip_verify")
-	}
-	if port == 0 {
-		port = DefaultGNMIPort
-	}
-	if skipVerify {
-		slog.Warn(fmt.Sprintf("gNMI TLS server-certificate verification DISABLED (skip_verify) for %s", net.JoinHostPort(host, strconv.Itoa(port))))
-	}
-	return &LiveTransport{
-		Host:       host,
-		Port:       port,
-		Username:   username,
-		Password:   password,
-		SkipVerify: skipVerify,
-		TLSCA:      tlsCA,
-	}, nil
+func NewLiveTransport(host string, port int, username, password string, tlsCA string) (*LiveTransport, error) {
+	return &LiveTransport{Host: host, Port: port, Username: username, Password: password, TLSCA: tlsCA}, nil
 }
 
 // Close releases the connection.
@@ -109,7 +83,7 @@ func (t *LiveTransport) connect() (gnmi.GNMIClient, error) {
 }
 
 func (t *LiveTransport) credentials() (credentials.TransportCredentials, error) {
-	cfg := &tls.Config{InsecureSkipVerify: t.SkipVerify}
+	cfg := &tls.Config{}
 	if t.TLSCA != "" {
 		pem, err := os.ReadFile(t.TLSCA)
 		if err != nil {

@@ -96,12 +96,8 @@ func testTarget(
 	if err != nil {
 		return TargetTestResult{}, false, err
 	}
-	enabledNames, err := st.EnabledModules(name, names)
-	if err != nil {
-		return TargetTestResult{}, false, err
-	}
-	enabled := make(map[string]bool, len(enabledNames))
-	for _, module := range enabledNames {
+	enabled := map[string]bool{}
+	for _, module := range state.Enabled(row, names) {
 		enabled[module] = true
 	}
 	var paths []string

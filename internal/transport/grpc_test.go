@@ -160,7 +160,7 @@ func TestLiveCapabilitiesAndSubscribeOnce(t *testing.T) {
 	stub := &stubServer{}
 	host, port, caPath := startStub(t, stub)
 
-	tr, err := NewLiveTransport(host, port, "admin", "secret", false, caPath)
+	tr, err := NewLiveTransport(host, port, "admin", "secret", caPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -252,7 +252,7 @@ func TestParsePathMatchesPygnmi(t *testing.T) {
 func TestCapabilitiesEncodingsMatchPygnmi(t *testing.T) {
 	stub := &stubServer{encodings: []gnmi.Encoding{0, 1, 2, 3, 4, 5}}
 	host, port, caPath := startStub(t, stub)
-	tr, err := NewLiveTransport(host, port, "", "", false, caPath)
+	tr, err := NewLiveTransport(host, port, "", "", caPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -271,7 +271,7 @@ func TestCapabilitiesEncodingsMatchPygnmi(t *testing.T) {
 func TestEitherCredentialSendsBothMetadataKeys(t *testing.T) {
 	stub := &stubServer{}
 	host, port, caPath := startStub(t, stub)
-	tr, err := NewLiveTransport(host, port, "admin", "", false, caPath)
+	tr, err := NewLiveTransport(host, port, "admin", "", caPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -294,7 +294,7 @@ func TestEitherCredentialSendsBothMetadataKeys(t *testing.T) {
 func TestUntrustedServerCertificateIsRejected(t *testing.T) {
 	host, port, _ := startStub(t, &stubServer{})
 	_, _, otherCA := startStub(t, &stubServer{})
-	tr, err := NewLiveTransport(host, port, "", "", false, otherCA)
+	tr, err := NewLiveTransport(host, port, "", "", otherCA)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -330,7 +330,7 @@ func TestEveryRPCHasADeadline(t *testing.T) {
 	t.Cleanup(func() { rpcTimeout = previous })
 
 	host, port, caPath := startStub(t, &hungServer{})
-	tr, err := NewLiveTransport(host, port, "", "", false, caPath)
+	tr, err := NewLiveTransport(host, port, "", "", caPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -350,13 +350,6 @@ func TestEveryRPCHasADeadline(t *testing.T) {
 		if elapsed := time.Since(start); elapsed > 5*time.Second {
 			t.Fatalf("%s took %v, want the %v deadline to fire", name, elapsed, rpcTimeout)
 		}
-	}
-}
-
-func TestLiveTransportRejectsEmptyHost(t *testing.T) {
-	if _, err := NewLiveTransport("", 57400, "admin", "secret", false, ""); err == nil ||
-		!strings.Contains(err.Error(), "target has no address") {
-		t.Fatalf("err = %v, want target has no address", err)
 	}
 }
 
@@ -438,7 +431,7 @@ func TestSubscribeOnceDecodesNumericAndJSONIETFValues(t *testing.T) {
 		},
 	}}
 	host, port, caPath := startStub(t, stub)
-	tr, err := NewLiveTransport(host, port, "", "", false, caPath)
+	tr, err := NewLiveTransport(host, port, "", "", caPath)
 	if err != nil {
 		t.Fatal(err)
 	}

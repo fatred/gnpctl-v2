@@ -173,15 +173,8 @@ func Show(st *state.State, cat *catalog.LayeredCatalog, target *string) ([]Row, 
 	for _, row := range rows {
 		r := Row{Name: rowString(row, "name"), CatalogKey: rowString(row, "catalog_key")}
 		for _, name := range names {
-			value, err := st.ModuleValue(r.Name, name)
-			if err != nil {
-				return nil, err
-			}
-			v := 0
-			if value != nil {
-				v = *value
-			}
-			r.Modules.Set(name, label(v))
+			v, _ := row[state.ModuleColumn(name)].(int64)
+			r.Modules.Set(name, label(int(v)))
 		}
 		out = append(out, r)
 	}

@@ -129,7 +129,7 @@ func Load(path string) (*Config, error) {
 	if err := yaml.Unmarshal(data, &root); err != nil {
 		return nil, errorf("invalid YAML in config %s: %v", resolved, err)
 	}
-	m, ok := asMapping(root)
+	m, ok := root.(map[string]any)
 	if !ok {
 		return nil, errorf("config %s must be a YAML mapping", resolved)
 	}
@@ -461,27 +461,9 @@ func (v *validator) defaultModel(m map[string]any, key, path, name string) (map[
 }
 
 func (v *validator) subModel(raw any, path, name string) (map[string]any, bool) {
-	if mm, ok := asMapping(raw); ok {
+	if mm, ok := raw.(map[string]any); ok {
 		return mm, true
 	}
 	v.add(path, "Input should be a valid dictionary or instance of "+name, "model_type")
-	return nil, false
-}
-
-func asMapping(raw any) (map[string]any, bool) {
-	switch t := raw.(type) {
-	case map[string]any:
-		return t, true
-	case map[any]any:
-		m := make(map[string]any, len(t))
-		for k, val := range t {
-			s, ok := k.(string)
-			if !ok {
-				return nil, false
-			}
-			m[s] = val
-		}
-		return m, true
-	}
 	return nil, false
 }

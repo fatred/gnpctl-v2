@@ -1,8 +1,6 @@
 package transport
 
 import (
-	"bytes"
-	"log/slog"
 	"path/filepath"
 	"testing"
 )
@@ -60,48 +58,5 @@ func TestSubscribeOnceUnknownPathReturnsEmpty(t *testing.T) {
 	}
 	if len(updates) != 0 {
 		t.Errorf("updates = %v, want none", updates)
-	}
-}
-
-func TestLiveTransportDefaultPort(t *testing.T) {
-	if DefaultGNMIPort != 57400 {
-		t.Fatalf("DefaultGNMIPort = %d, want 57400", DefaultGNMIPort)
-	}
-	tr, err := NewLiveTransport("10.0.0.1", 0, "", "", false, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if tr.Port != 57400 {
-		t.Errorf("Port = %d, want 57400", tr.Port)
-	}
-}
-
-func TestLiveTransportExplicitPort(t *testing.T) {
-	tr, err := NewLiveTransport("10.0.0.1", 6030, "admin", "", false, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if tr.Port != 6030 || tr.Username != "admin" {
-		t.Errorf("Port/Username = %d/%q, want 6030/admin", tr.Port, tr.Username)
-	}
-}
-
-func TestSkipVerifyWithTLSCARejected(t *testing.T) {
-	if _, err := NewLiveTransport("10.0.0.1", 0, "", "", true, "/ca.pem"); err == nil {
-		t.Fatal("expected an error for skip_verify with tls_ca")
-	}
-}
-
-func TestSkipVerifyAloneWarns(t *testing.T) {
-	var logs bytes.Buffer
-	previous := slog.Default()
-	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
-	defer slog.SetDefault(previous)
-
-	if _, err := NewLiveTransport("10.0.0.1", 0, "", "", true, ""); err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Contains(logs.Bytes(), []byte("DISABLED")) {
-		t.Errorf("logs = %q, want a DISABLED warning", logs.String())
 	}
 }

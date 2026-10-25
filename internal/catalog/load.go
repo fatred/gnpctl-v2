@@ -1,8 +1,10 @@
 package catalog
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -119,7 +121,6 @@ func loadProcessors(root string) (*ProcessorLibrary, error) {
 				return nil, catalogErr("%s: duplicate processor '%s' (also in %s)", path, proc, prev)
 			}
 			seen[proc] = path
-			library.names = append(library.names, proc)
 			library.specs[proc] = node.Content[i+1]
 		}
 	}
@@ -368,12 +369,7 @@ func validateYangRefs(modules OrderedMap[*ModuleBlock], yang *YangRegistry, vend
 					path, name, p.PathKey(), *p.Yang)
 			}
 		}
-		metricNames := make([]string, 0, len(block.Metrics))
-		for mname := range block.Metrics {
-			metricNames = append(metricNames, mname)
-		}
-		sort.Strings(metricNames)
-		for _, mname := range metricNames {
+		for _, mname := range slices.Sorted(maps.Keys(block.Metrics)) {
 			decl := block.Metrics[mname]
 			if decl.Yang != nil && *decl.Yang != "" && !known[*decl.Yang] {
 				return catalogErr("%s: module '%s' metric '%s' references unknown yang id '%s'",
@@ -431,18 +427,9 @@ func (c *LayeredCatalog) DefaultPortForPlatform(hint *string) *int {
 		return nil
 	}
 	for _, variant := range c.variants {
-		if contains(variant.PlatformHints, *hint) && variant.DefaultPort != nil {
+		if slices.Contains(variant.PlatformHints, *hint) && variant.DefaultPort != nil {
 			return variant.DefaultPort
 		}
 	}
 	return nil
-}
-
-func contains(items []string, want string) bool {
-	for _, item := range items {
-		if item == want {
-			return true
-		}
-	}
-	return false
 }

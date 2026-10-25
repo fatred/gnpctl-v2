@@ -3,6 +3,7 @@ package catalog
 import (
 	"fmt"
 	"path"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -84,7 +85,7 @@ func identityValue(identity map[string]any, key string) *string {
 
 // modelsMatch reports whether any advertised model contains any wanted substring.
 func modelsMatch(advertised, wanted []string) bool {
-	if contains(wanted, "*") {
+	if slices.Contains(wanted, "*") {
 		return true
 	}
 	for _, token := range wanted {
@@ -99,7 +100,7 @@ func modelsMatch(advertised, wanted []string) bool {
 
 // globAny reports whether value matches any glob; ["*"] matches even a missing value.
 func globAny(value *string, globs []string) bool {
-	if contains(globs, "*") {
+	if slices.Contains(globs, "*") {
 		return true
 	}
 	if value == nil {
