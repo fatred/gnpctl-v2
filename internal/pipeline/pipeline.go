@@ -47,14 +47,13 @@ func liveTransport(target map[string]any, port int) (transport.GnmiTransport, er
 }
 
 // ResolvePort is the effective port: explicit -> variant default by platform
-// hint -> 57400. A non-positive explicit port or catalog default counts as
-// unset, so a row stored as 0 still reaches its device.
+// hint -> 57400. A non-positive explicit port counts as unset.
 func ResolvePort(target map[string]any, cat *catalog.LayeredCatalog) int {
 	if port := intField(target, "port"); port > 0 {
 		return port
 	}
 	hint := stringField(target, "platform_hint")
-	if port := cat.DefaultPortForPlatform(&hint); port != nil && *port > 0 {
+	if port := cat.DefaultPortForPlatform(&hint); port != nil {
 		return *port
 	}
 	return transport.DefaultGNMIPort
