@@ -2,9 +2,13 @@ package inventory
 
 import (
 	"errors"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/fatred/gnpctl-v2/internal/inventory/sources"
@@ -253,6 +257,79 @@ func TestDiffReportsVarianceWithoutWriting(t *testing.T) {
 	}
 	if added, err := s.GetTarget("leaf3"); err != nil || added != nil {
 		t.Fatalf("diff inserted leaf3: %v, %v", added, err)
+	}
+}
+
+// TestDiffReportsPortOnlyChange covers a NetBox service-port change: address
+// and platform are identical, so only the port comparison can report it.
+func TestDiffReportsPortOnlyChange(t *testing.T) {
+	t.Setenv("NETBOX_TOKEN", "tok")
+	var port atomic.Int64
+	port.Store(57400)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, `{"data":{"device_list":[{
+		  "name": "leaf1",
+		  "primary_ip4": {"address": "10.0.0.1/24"},
+		  "platform": {"slug": "nokia_srl"},
+		  "services": [{"name": "gnmi", "ports": [%d], "ipaddresses": []}]
+		}]}}`, port.Load())
+	}))
+	t.Cleanup(srv.Close)
+
+	s := newInventoryState(t)
+	// state.AddSource directly: the https guard is a pull-path policy, and the
+	// httptest server's certificate would not be in the client's trust store.
+	if err := s.AddSource("nb", "netbox", map[string]any{"url": srv.URL, "tag": "gnmi"}, "NETBOX_TOKEN"); err != nil {
+		t.Fatalf("AddSource: %v", err)
+	}
+	if _, err := Pull(s, nil, new(int64(1))); err != nil {
+		t.Fatalf("Pull: %v", err)
+	}
+	target, err := s.GetTarget("leaf1")
+	if err != nil || target == nil {
+		t.Fatalf("GetTarget = %v, %v", target, err)
+	}
+	if target["port"] != int64(57400) {
+		t.Fatalf("port = %#v, want 57400", target["port"])
+	}
+
+	port.Store(57401)
+	result, err := Diff(s, nil)
+	if err != nil {
+		t.Fatalf("Diff: %v", err)
+	}
+	if !contains(result.Changed, "leaf1") || len(result.Added) != 0 || len(result.Removed) != 0 {
+		t.Fatalf("diff = %+v, want only leaf1 changed", result)
+	}
+	target, err = s.GetTarget("leaf1")
+	if err != nil || target == nil {
+		t.Fatalf("GetTarget = %v, %v", target, err)
+	}
+	if target["port"] != int64(57400) {
+		t.Fatalf("diff wrote port %#v", target["port"])
+	}
+}
+
+// TestPullPreservesDiscoveredPort guards the nil-port branch of UpsertTarget: a
+// source that knows no port must not NULL the port discovery resolved.
+func TestPullPreservesDiscoveredPort(t *testing.T) {
+	s := newInventoryState(t)
+	addNornirSource(t, s, inventoryA, "clab")
+	if _, err := Pull(s, nil, new(int64(100))); err != nil {
+		t.Fatalf("Pull: %v", err)
+	}
+	if err := s.SetTargetPort("leaf1", 6030); err != nil {
+		t.Fatalf("SetTargetPort: %v", err)
+	}
+	if _, err := Pull(s, nil, new(int64(200))); err != nil {
+		t.Fatalf("Pull: %v", err)
+	}
+	target, err := s.GetTarget("leaf1")
+	if err != nil || target == nil {
+		t.Fatalf("GetTarget = %v, %v", target, err)
+	}
+	if target["port"] != int64(6030) {
+		t.Fatalf("port = %#v, want the discovered 6030", target["port"])
 	}
 }
 

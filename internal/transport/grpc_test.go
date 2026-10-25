@@ -36,7 +36,8 @@ type stubServer struct {
 	encoding gnmi.Encoding
 	path     *gnmi.Path
 
-	encodings []gnmi.Encoding // overrides the default capability list
+	encodings    []gnmi.Encoding // overrides the default capability list
+	notification *gnmi.Notification
 }
 
 func (s *stubServer) Capabilities(ctx context.Context, _ *gnmi.CapabilityRequest) (*gnmi.CapabilityResponse, error) {
@@ -76,14 +77,17 @@ func (s *stubServer) Subscribe(stream grpc.BidiStreamingServer[gnmi.SubscribeReq
 	}
 	s.mu.Unlock()
 
-	notification := &gnmi.Notification{
-		Prefix: &gnmi.Path{Elem: []*gnmi.PathElem{{Name: "system"}}},
-		Update: []*gnmi.Update{{
-			Path: &gnmi.Path{Elem: []*gnmi.PathElem{{Name: "information"}, {Name: "version"}}},
-			Val: &gnmi.TypedValue{
-				Value: &gnmi.TypedValue_StringVal{StringVal: "v24.10.4"},
-			},
-		}},
+	notification := s.notification
+	if notification == nil {
+		notification = &gnmi.Notification{
+			Prefix: &gnmi.Path{Elem: []*gnmi.PathElem{{Name: "system"}}},
+			Update: []*gnmi.Update{{
+				Path: &gnmi.Path{Elem: []*gnmi.PathElem{{Name: "information"}, {Name: "version"}}},
+				Val: &gnmi.TypedValue{
+					Value: &gnmi.TypedValue_StringVal{StringVal: "v24.10.4"},
+				},
+			}},
+		}
 	}
 	if err := stream.Send(&gnmi.SubscribeResponse{
 		Response: &gnmi.SubscribeResponse_Update{Update: notification},
@@ -353,5 +357,102 @@ func TestLiveTransportRejectsEmptyHost(t *testing.T) {
 	if _, err := NewLiveTransport("", 57400, "admin", "secret", false, ""); err == nil ||
 		!strings.Contains(err.Error(), "target has no address") {
 		t.Fatalf("err = %v, want target has no address", err)
+	}
+}
+
+func TestTypedValue(t *testing.T) {
+	leaflist := func(elements ...string) *gnmi.TypedValue {
+		list := &gnmi.ScalarArray{}
+		for _, element := range elements {
+			list.Element = append(list.Element, &gnmi.TypedValue{
+				Value: &gnmi.TypedValue_StringVal{StringVal: element},
+			})
+		}
+		return &gnmi.TypedValue{Value: &gnmi.TypedValue_LeaflistVal{LeaflistVal: list}}
+	}
+	cases := []struct {
+		name  string
+		value *gnmi.TypedValue
+		want  any
+	}{
+		{"string", &gnmi.TypedValue{Value: &gnmi.TypedValue_StringVal{StringVal: "v24.10.4"}}, "v24.10.4"},
+		{"int", &gnmi.TypedValue{Value: &gnmi.TypedValue_IntVal{IntVal: -42}}, int64(-42)},
+		{"uint", &gnmi.TypedValue{Value: &gnmi.TypedValue_UintVal{UintVal: 42}}, uint64(42)},
+		{"bool", &gnmi.TypedValue{Value: &gnmi.TypedValue_BoolVal{BoolVal: true}}, true},
+		{"float", &gnmi.TypedValue{Value: &gnmi.TypedValue_FloatVal{FloatVal: 1.5}}, float64(1.5)},
+		{"double", &gnmi.TypedValue{Value: &gnmi.TypedValue_DoubleVal{DoubleVal: 2.5}}, float64(2.5)},
+		{
+			"json object",
+			&gnmi.TypedValue{Value: &gnmi.TypedValue_JsonVal{JsonVal: []byte(`{"a":1}`)}},
+			map[string]any{"a": float64(1)},
+		},
+		{
+			"json_ietf object",
+			&gnmi.TypedValue{Value: &gnmi.TypedValue_JsonIetfVal{
+				JsonIetfVal: []byte(`{"system":{"hostname":"leaf1"}}`),
+			}},
+			map[string]any{"system": map[string]any{"hostname": "leaf1"}},
+		},
+		{
+			"json_ietf scalar",
+			&gnmi.TypedValue{Value: &gnmi.TypedValue_JsonIetfVal{JsonIetfVal: []byte("42")}},
+			float64(42),
+		},
+		{"leaflist", leaflist("a", "b"), "ab"},
+		{
+			"invalid json",
+			&gnmi.TypedValue{Value: &gnmi.TypedValue_JsonIetfVal{JsonIetfVal: []byte("{")}},
+			nil,
+		},
+		// bytes_val has no decoder (nil); pygnmi reinterprets it as a float32,
+		// but gnpctl never requests BYTES encoding so it is unreachable.
+		{
+			"bytes",
+			&gnmi.TypedValue{Value: &gnmi.TypedValue_BytesVal{BytesVal: []byte{1, 2}}},
+			nil,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := typedValue(c.value); !reflect.DeepEqual(got, c.want) {
+				t.Errorf("typedValue = %#v, want %#v", got, c.want)
+			}
+		})
+	}
+}
+
+// TestSubscribeOnceDecodesNumericAndJSONIETFValues covers the two decoder
+// branches `gnpctl test` and Arista's json_ietf capability probe rely on.
+func TestSubscribeOnceDecodesNumericAndJSONIETFValues(t *testing.T) {
+	stub := &stubServer{notification: &gnmi.Notification{
+		Prefix: &gnmi.Path{Elem: []*gnmi.PathElem{{Name: "interfaces"}}},
+		Update: []*gnmi.Update{
+			{
+				Path: &gnmi.Path{Elem: []*gnmi.PathElem{{Name: "interface"}, {Name: "state"}, {Name: "count"}}},
+				Val:  &gnmi.TypedValue{Value: &gnmi.TypedValue_UintVal{UintVal: 7}},
+			},
+			{
+				Path: &gnmi.Path{Elem: []*gnmi.PathElem{{Name: "state"}}},
+				Val:  &gnmi.TypedValue{Value: &gnmi.TypedValue_JsonIetfVal{JsonIetfVal: []byte(`{"mtu":9000}`)}},
+			},
+		},
+	}}
+	host, port, caPath := startStub(t, stub)
+	tr, err := NewLiveTransport(host, port, "", "", false, caPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { tr.Close() })
+
+	updates, err := tr.SubscribeOnce([]string{"/interfaces/state"}, "json_ietf")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []LeafUpdate{
+		{Path: "interfaces/interface/state/count", Value: uint64(7)},
+		{Path: "interfaces/state", Value: map[string]any{"mtu": float64(9000)}},
+	}
+	if !reflect.DeepEqual(updates, want) {
+		t.Errorf("updates = %#v, want %#v", updates, want)
 	}
 }
