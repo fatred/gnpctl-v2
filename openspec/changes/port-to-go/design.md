@@ -51,3 +51,7 @@ Coding: `deepseek/deepseek-flash`. Reviews: `anthropic/claude-opus-5-5:high`. Ev
 - **YAML formatting**: rendered files use yaml.v3 (indented sequences, quoting); structurally equal to Python's, not byte-equal.
 - **Empty strings**: discovery stores NULL for absent text values (as Python's None); inventory identity fields keep `""` as given.
 - **Usage errors** exit 2 like click.
+- **Error text**: `last_error` and discover progress lines drop Python's exception class prefix (`RuntimeError: …`); the message is kept.
+- **CLI surface**: cobra adds a `help` command and prints bare-invocation help to stderr; usage-error wording differs from click's (exit code 2 is kept).
+- **Empty `render.output_dir`** is an error in Go (Python writes to the current directory).
+- **Duplicate nornir host names** are upserted in order (last wins, same final row as Python); only the "pulled N" count can differ.

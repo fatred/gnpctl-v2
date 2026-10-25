@@ -11,3 +11,6 @@ go.work.sum
 *.test
 *.out
 coverage.*
+# generated OpenSpec tool folders (regenerate with `openspec init`); .omp/ is the one in use
+/.claude/
+/.opencode/
