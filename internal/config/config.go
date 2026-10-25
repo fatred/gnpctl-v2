@@ -143,14 +143,13 @@ func Load(path string) (*Config, error) {
 
 // ApplyOverrides applies CLI overrides over config values (flags win). An empty
 // argument leaves the corresponding config value untouched.
-func (c *Config) ApplyOverrides(state, catalog string) *Config {
+func (c *Config) ApplyOverrides(state, catalog string) {
 	if state != "" {
 		c.Database = state
 	}
 	if catalog != "" {
 		c.Catalog = catalog
 	}
-	return c
 }
 
 // RequireRender returns the render block or fails clearly when it is absent.

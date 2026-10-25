@@ -337,9 +337,7 @@ func TestRequireRenderReturnsBlock(t *testing.T) {
 
 func TestFlagOverridesConfig(t *testing.T) {
 	c := &Config{Database: "db", Catalog: "cat"}
-	if got := c.ApplyOverrides("", "/other"); got != c {
-		t.Fatal("ApplyOverrides did not return the config")
-	}
+	c.ApplyOverrides("", "/other")
 	if c.Catalog != "/other" || c.Database != "db" {
 		t.Fatalf("config = %+v", c)
 	}
