@@ -48,3 +48,7 @@ Spec-driven with OpenSpec: `openspec/changes/port-to-go/`. Implementation plan: 
 `scripts/gen-golden.sh` regenerates `testdata/golden` from the Python reference at `../gnpctl`.
 
 > The shipped `catalog/` entries use representative gNMI paths; validate them against real devices before production.
+
+## License
+
+Apache License 2.0 (see `LICENSE`). You may use, modify and redistribute this software, including in commercial and corporate settings, provided you keep the license text and the attribution in `NOTICE` with any redistribution and mark files you changed. The license includes an express patent grant.
