@@ -385,6 +385,10 @@ func (v *Variant) validate() error {
 	if v.Vendor == "" {
 		return fieldRequired("Variant", "vendor")
 	}
+	if v.DefaultPort != nil && *v.DefaultPort <= 0 {
+		return valueError("Variant", "default_port",
+			fmt.Sprintf("invalid default_port %d (must be positive)", *v.DefaultPort))
+	}
 	for _, name := range v.Modules.Names() {
 		block, _ := v.Modules.Get(name)
 		if err := block.validate("Variant", "modules."+name); err != nil {
