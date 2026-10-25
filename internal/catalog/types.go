@@ -4,8 +4,9 @@ package catalog
 
 import (
 	"fmt"
+	"maps"
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -264,11 +265,8 @@ func (r *ModuleRegistry) Contains(name string) bool {
 // ProcessorLibrary holds named, gnmic-native event-processor specs (egress-side).
 // Get returns the raw YAML node so callers can re-emit the spec in file order.
 type ProcessorLibrary struct {
-	names []string
 	specs map[string]*yaml.Node
 }
-
-func (p *ProcessorLibrary) Names() []string { return append([]string(nil), p.names...) }
 
 func (p *ProcessorLibrary) Get(name string) *yaml.Node { return p.specs[name] }
 
@@ -426,12 +424,7 @@ func (b *ModuleBlock) validate(model, prefix string) error {
 				fmt.Sprintf("invalid mode '%s' (expected one of %s)", p.Mode, modesList))
 		}
 	}
-	names := make([]string, 0, len(b.Metrics))
-	for name := range b.Metrics {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	for _, name := range names {
+	for _, name := range slices.Sorted(maps.Keys(b.Metrics)) {
 		decl := b.Metrics[name]
 		loc := prefix + ".metrics." + name
 		if decl == nil {

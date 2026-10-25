@@ -306,20 +306,15 @@ func (s *State) ModuleValue(target, name string) (*int, error) {
 	return &n, nil
 }
 
-// EnabledModules returns the names whose effective enum is enabled (>= 1) for
-// the target.
-func (s *State) EnabledModules(target string, names []string) ([]string, error) {
+// Enabled returns the names whose mod_ column in a target row is enabled (>= 1).
+func Enabled(row map[string]any, names []string) []string {
 	var enabled []string
 	for _, name := range names {
-		v, err := s.ModuleValue(target, name)
-		if err != nil {
-			return nil, err
-		}
-		if v != nil && *v >= 1 {
+		if v, _ := row[ModuleColumn(name)].(int64); v >= 1 {
 			enabled = append(enabled, name)
 		}
 	}
-	return enabled, nil
+	return enabled
 }
 
 // ReconcileModules sets discovery-owned columns (current 0/1) to the profile

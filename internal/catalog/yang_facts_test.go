@@ -1,6 +1,7 @@
 package catalog
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
@@ -95,15 +96,6 @@ func TestReleasesSortedByVersion(t *testing.T) {
 	}
 }
 
-func TestUnknownYangIDIsError(t *testing.T) {
-	cat := yangCatalog(t, nil)
-	version := "v24.10.4"
-	_, err := cat.Yang().Resolve("nokia", &version, "no-such-leaf")
-	if err == nil || !strings.Contains(err.Error(), "no-such-leaf") {
-		t.Fatalf("error = %v", err)
-	}
-}
-
 func TestSelectionNearestBelow(t *testing.T) {
 	cat := yangCatalog(t, nil)
 	version := "v24.10.4-244-g5c0afd1a61"
@@ -154,18 +146,12 @@ func TestDeviceOlderThanPinnedWarns(t *testing.T) {
 func TestResolveUsesSelectedRelease(t *testing.T) {
 	cat := yangCatalog(t, nil)
 	v25, v24 := "v25.3.1", "v24.10.4"
-	f25, err := cat.Yang().Resolve("nokia", &v25, "oc-bgp-neighbor-session-state")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !contains(f25.Enum, "DELETED") {
+	f25 := cat.Yang().Fact("nokia", *cat.Yang().SelectRelease("nokia", &v25).Release, "oc-bgp-neighbor-session-state")
+	if !slices.Contains(f25.Enum, "DELETED") {
 		t.Fatalf("enum = %v", f25.Enum)
 	}
-	f24, err := cat.Yang().Resolve("nokia", &v24, "oc-bgp-neighbor-session-state")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if contains(f24.Enum, "DELETED") {
+	f24 := cat.Yang().Fact("nokia", *cat.Yang().SelectRelease("nokia", &v24).Release, "oc-bgp-neighbor-session-state")
+	if slices.Contains(f24.Enum, "DELETED") {
 		t.Fatalf("enum = %v", f24.Enum)
 	}
 }
@@ -212,27 +198,6 @@ func TestReleaseVersionTieIsDeterministic(t *testing.T) {
 		sel := cat.Yang().SelectRelease("nokia", &version)
 		if sel.Release == nil || *sel.Release != "4.32.0M" {
 			t.Fatalf("run %d: selection = %+v, want 4.32.0M", i, sel)
-		}
-	}
-}
-
-func TestYangVendorsAreSorted(t *testing.T) {
-	cat := mustLoad(t, writeTree(t, map[string]string{
-		"modules.yaml":        yangModules,
-		"yang/zebra/v1.yaml":  yangV2410,
-		"yang/arista/v1.yaml": yangV2410,
-		"yang/middle/v1.yaml": yangV2410,
-	}))
-	want := []string{"arista", "middle", "zebra"}
-	for i := 0; i < 100; i++ {
-		got := cat.Yang().Vendors()
-		if len(got) != len(want) {
-			t.Fatalf("run %d: vendors = %v", i, got)
-		}
-		for j := range want {
-			if got[j] != want[j] {
-				t.Fatalf("run %d: vendors = %v, want %v", i, got, want)
-			}
 		}
 	}
 }

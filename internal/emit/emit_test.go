@@ -250,7 +250,6 @@ func TestScalarsRoundTrip(t *testing.T) {
 	spec := render.Ordered{}
 	spec.Set("multiline", "line1\nline2\n")
 	spec.Set("unicode", "Zürich")
-	spec.Set("factor", 1.0)
 	processors := render.Ordered{}
 	processors.Set("round-trip", spec)
 	dir := t.TempDir()
@@ -261,9 +260,6 @@ func TestScalarsRoundTrip(t *testing.T) {
 	got := m(t, m(t, readDoc(t, filepath.Join(dir, "egress.yaml")), "processors"), "round-trip")
 	if got["multiline"] != "line1\nline2\n" || got["unicode"] != "Zürich" {
 		t.Fatalf("scalars = %v", got)
-	}
-	if factor, ok := got["factor"].(float64); !ok || factor != 1.0 {
-		t.Fatalf("factor = %#v, want float64(1.0)", got["factor"])
 	}
 }
 

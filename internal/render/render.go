@@ -278,10 +278,7 @@ func collectSlices(
 			return nil, nil, err
 		}
 		name := stringValue(row["name"])
-		enabled, err := st.EnabledModules(name, moduleNames)
-		if err != nil {
-			return nil, nil, err
-		}
+		enabled := state.Enabled(row, moduleNames)
 		enabledSet := make(map[string]bool, len(enabled))
 		for _, m := range enabled {
 			enabledSet[m] = true

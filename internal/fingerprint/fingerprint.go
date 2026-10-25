@@ -4,6 +4,7 @@ package fingerprint
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -103,10 +104,10 @@ func matches(profile *capabilities.Profile, match catalog.MatchRule) bool {
 // versionGE mirrors _version_ge: an empty actual version never satisfies a
 // minimum, and tuples compare element-wise with a longer prefix winning.
 func versionGE(actual any, minimum string) bool {
-	if falsy(actual) {
+	if actual == nil || actual == "" { // Parse stores "" for a falsy version
 		return false
 	}
-	return compareTuples(versionTuple(pyString(actual)), versionTuple(minimum)) >= 0
+	return slices.Compare(versionTuple(fmt.Sprint(actual)), versionTuple(minimum)) >= 0
 }
 
 // versionTuple takes the leading digits of each dot-separated chunk (0 when a
@@ -125,47 +126,4 @@ func versionTuple(value string) []int {
 		parts[i] = n
 	}
 	return parts
-}
-
-func compareTuples(a, b []int) int {
-	for i := 0; i < len(a) && i < len(b); i++ {
-		if a[i] != b[i] {
-			if a[i] < b[i] {
-				return -1
-			}
-			return 1
-		}
-	}
-	switch {
-	case len(a) < len(b):
-		return -1
-	case len(a) > len(b):
-		return 1
-	}
-	return 0
-}
-
-func falsy(value any) bool {
-	switch v := value.(type) {
-	case nil:
-		return true
-	case string:
-		return v == ""
-	case bool:
-		return !v
-	case float64:
-		return v == 0
-	case int:
-		return v == 0
-	case int64:
-		return v == 0
-	}
-	return false
-}
-
-func pyString(value any) string {
-	if s, ok := value.(string); ok {
-		return s
-	}
-	return fmt.Sprint(value)
 }

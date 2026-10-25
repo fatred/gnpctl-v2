@@ -41,7 +41,7 @@ func liveTransport(target map[string]any, port int) (transport.GnmiTransport, er
 		return nil, errors.New("gNMI credentials not set — export TARGET_USER and TARGET_PASS (the device account gnpctl connects with)")
 	}
 	return transport.NewLiveTransport(
-		host, port, username, password, false, os.Getenv("GNMI_TLS_CA"),
+		host, port, username, password, os.Getenv("GNMI_TLS_CA"),
 	)
 }
 

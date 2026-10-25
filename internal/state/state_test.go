@@ -301,10 +301,11 @@ func TestEnabledModulesThreshold(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	enabled, err := s.EnabledModules("leaf1", []string{"ports", "bgp-peers", "isis"})
+	row, err := s.GetTarget("leaf1")
 	if err != nil {
 		t.Fatal(err)
 	}
+	enabled := Enabled(row, []string{"ports", "bgp-peers", "isis"})
 	if len(enabled) != 2 || enabled[0] != "ports" || enabled[1] != "bgp-peers" {
 		t.Fatalf("enabled = %v", enabled)
 	}
