@@ -1,0 +1,38 @@
+# Sensors / power-supply (egress, gnmic 0.46). The catalog `sensors` module carries
+# power-supply operational state. Emit it as a FUNCTIONAL gauge (alertable), with the
+# raw state kept as a label only for colour:
+#   power_supply_state  gauge  1 = working / 0 = not working / -1 = not present|unknown
+#   label oper_state="up"|"failed"|...    (colour only; alert on the number)
+#   e.g. alert: power_supply_state == 0   (or < 1 to include unknown)
+#
+# State buckets (adjust the sets as policy dictates):
+#   1  working      : up, ACTIVE
+#   0  not working  : down, failed, degraded, low-power, INACTIVE
+#   -1 not present  : empty, downloading/booting/starting/synchronizing/upgrading/
+#      / unknown      warm-reboot, DISABLED, and any unmapped value
+#
+# Verified leaves/enums:
+#   nokia-srlinux : /platform/power-supply[id=*]/oper-state  (srl-comm:oper-state =
+#       up/down/empty/downloading/booting/starting/failed/synchronizing/upgrading/
+#       low-power/degraded/warm-reboot — srl_nokia-common.yang v24.10)
+#   juniper-mx/qfx: /components/component/state[type=POWER_SUPPLY] -> .../oper-status
+#       (OpenConfig: ACTIVE/INACTIVE/DISABLED)
+# Validated on prod Juniper too (defra1, QFX5k/QFX10k @ 23.4R2).
+#
+# Validated on live SRL (clab, gnmic 0.46): power_supply_state with oper_state label
+# + power-supply_id tag. clab PSUs are virtual (oper-state=empty -> -1, not present);
+# real hardware reports up -> 1.
+
+# Map oper-state/oper-status -> power_supply_state {1,0,-1}; keep the raw value as the
+# oper_state label. event-jq gets the whole event list, so map() per-event; guard
+# (.values // {}) for the tag-only events in the juniper component subtree. Single
+# string scalar (the only place a flow scalar is acceptable).
+sensors-state:
+  event-jq:
+    expression: 'map((.values // {}) as $v | ($v|keys|map(select(test("oper-stat(e|us)$")))) as $k | if ($k|length) > 0 then ($v[$k[0]]) as $raw | ($raw|ascii_upcase) as $s | .tags.oper_state = $raw | .values = {"power_supply_state": (if ["UP","ACTIVE"]|index($s) then 1 elif ["DOWN","FAILED","DEGRADED","LOW-POWER","INACTIVE"]|index($s) then 0 else -1 end)} else . end)'
+
+# Keep only the metric; drop the rest of the component subtree (juniper).
+sensors-keep:
+  event-allow:
+    value-names:
+      - "^power_supply_state$"

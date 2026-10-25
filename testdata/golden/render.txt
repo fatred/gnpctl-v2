@@ -1,0 +1,4 @@
+exit=0
+wrote /tmp/tmp9gxak6po/render/ingress.yaml
+wrote /tmp/tmp9gxak6po/render/targets.yaml
+wrote /tmp/tmp9gxak6po/render/egress.yaml

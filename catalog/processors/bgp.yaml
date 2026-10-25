@@ -1,0 +1,86 @@
+# BGP normalization chain (egress, gnmic 0.46). Normalizes nokia-native and
+# juniper-OpenConfig BGP neighbor state into a common Prometheus schema:
+#   bgp_neighbor_session_state  gauge 1..6  (BGP FSM: IDLE..ESTABLISHED)
+#   bgp_neighbor_peer_group     gauge 1, label peer_group="..."   (info series)
+#   bgp_neighbor_description    gauge 1, label description="..."   (info series)
+# Join metadata onto state in PromQL, e.g.:
+#   bgp_neighbor_session_state * on(neighbor_peer-address) group_left(peer_group) bgp_neighbor_peer_group
+#
+# gnmic emits ONE event per leaf (each value in its own message), so labels can't be
+# joined onto session-state at egress; peer_group/description are emitted as their
+# own info series instead. The chain is shared across all variants (suffix-regex
+# value matching + uppercasing, so SRL lowercase and Junos uppercase enums map).
+#
+# Validated on live SRL (clab, gnmic 0.46): per neighbor we get
+# bgp_neighbor_session_state (6 established / 3 active) and bgp_neighbor_peer_group=1
+# with the peer_group label (overlay/underlay/wan-edge); the subtree is pruned to
+# just those. bgp_neighbor_description uses the identical event-jq branch (fires
+# only where a description is set). last-established deferred (SRL RFC3339 string).
+
+# Rewrite each peer-group/description leaf event into its own info series:
+# value -> label, metric value -> 1, name -> bgp_neighbor_<thing>. (Other events
+# pass through unchanged.) gnmic event-jq receives the whole event list, so map()
+# over it per-event; guard with (.values // {}) since the subtree includes tag-only
+# events (no values). The expression must be a single string scalar.
+bgp-info:
+  event-jq:
+    expression: 'map(if ((.values // {})|keys|any(endswith("peer-group"))) then .tags.peer_group = (.values|to_entries|map(select(.key|endswith("peer-group")))[0].value) | .values = {"bgp_neighbor_peer_group":1} elif ((.values // {})|keys|any(endswith("description"))) then .tags.description = (.values|to_entries|map(select(.key|endswith("description")))[0].value) | .values = {"bgp_neighbor_description":1} else . end)'
+
+# session-state enum -> BGP FSM number (uppercase first so SRL/Junos both map).
+bgp-fsm:
+  event-strings:
+    value-names:
+      - ".*session-state$"
+    transforms:
+      - to-upper:
+          apply-on: value
+      - replace:
+          apply-on: value
+          old: "^IDLE$"
+          new: "1"
+      - replace:
+          apply-on: value
+          old: "^CONNECT$"
+          new: "2"
+      - replace:
+          apply-on: value
+          old: "^ACTIVE$"
+          new: "3"
+      - replace:
+          apply-on: value
+          old: "^OPENSENT$"
+          new: "4"
+      - replace:
+          apply-on: value
+          old: "^OPENCONFIRM$"
+          new: "5"
+      - replace:
+          apply-on: value
+          old: "^ESTABLISHED$"
+          new: "6"
+
+bgp-fsm-convert:
+  event-convert:
+    value-names:
+      - ".*session-state$"
+    type: int
+
+# Rename the session-state value key to the common metric name.
+bgp-rename:
+  event-strings:
+    value-names:
+      - ".*session-state$"
+    transforms:
+      - replace:
+          apply-on: name
+          old: ".*session-state$"
+          new: bgp_neighbor_session_state
+
+# gnmic emits one event per leaf; keep only the exported metrics (drop the rest of
+# the neighbor subtree). Runs last, after the renames.
+bgp-keep-state:
+  event-allow:
+    value-names:
+      - "^bgp_neighbor_session_state$"
+      - "^bgp_neighbor_peer_group$"
+      - "^bgp_neighbor_description$"

@@ -1,0 +1,16 @@
+# Arista EOS variant. Single variant for the vendor (no platform_match → matches
+# any Arista device). EOS advertises no PROTO, so the renderer encoding is
+# json_ietf. Subscription paths below are representative (OpenConfig) and should
+# be replaced/extended with the production gnmic ingestor paths.
+key: arista-eos
+vendor: arista
+platform_match: {}  # single Arista variant; matches any model
+default_port: 6030
+encoding: json_ietf
+platform_hints: ["arista_eos", "eos"]
+
+modules:
+  ports:
+    processors: [gnpctl-meta]
+    paths:
+      - {key: interface-counters, path: /interfaces/interface/state/counters, mode: sample, sample_interval: 30s, description: "Per-interface octets / errors / discards"}

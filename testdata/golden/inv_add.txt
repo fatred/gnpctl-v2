@@ -1,0 +1,2 @@
+exit=0
+added source 'clab' (nornir)

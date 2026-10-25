@@ -1,0 +1,25 @@
+# Nokia vendor definition.
+#
+# Stage-1: capabilities advertise organization "Nokia". Stage-2 platform probe
+# (Subscribe-ONCE) reads /system/information and extracts the running version
+# plus os/model parsed from the free-text description. Validated against a live
+# SR Linux node:
+#   .../information/version     = v24.10.4-244-g5c0afd1a61
+#   .../information/description = "SRLinux-v24.10.4-244-g5c0afd1a61 7220 IXR-D2L Copyright ..."
+vendor: nokia
+fingerprint:
+  priority: 100
+  match:
+    org_contains: ["Nokia"]
+    # SR Linux only. SR OS also advertises org "Nokia" but exposes nokia-conf/nokia-state
+    # models (not srl_nokia) — it is matched by the separate nokia-sros vendor unit.
+    models_any: ["srl_nokia"]
+platform_probe:
+  path: /system/information
+  encoding: json_ietf
+  extract:
+    os_version: version
+  parse:
+    # "SRLinux-v24.10.4-... 7220 IXR-D2L Copyright (c) ..." -> os=SRLinux, model="7220 IXR-D2L"
+    - from: description
+      pattern: '^(?P<os>\S+?)-\S+\s+(?P<model>.+?)\s+Copyright'

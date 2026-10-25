@@ -1,0 +1,22 @@
+# Nokia SR OS vendor definition — a distinct fingerprint unit from SR Linux.
+#
+# Both advertise organization "Nokia", so Stage-1 disambiguates on the advertised models:
+# SR OS exposes nokia-conf / nokia-state (+ vendored OpenConfig), SR Linux exposes
+# srl_nokia-*. Stage-2 probe (Subscribe-ONCE) reads /state/system/version — the
+# version-string carries both the running TiMOS release and the product model, e.g.
+#   "TiMOS-B-25.10.R1 both/hops64 Nokia 7750 SR Copyright (c) 2000-2025 Nokia."
+# Validated against live SR OS (defra1-az00-ed01): os_version 25.10.R1, model "7750 SR"
+# (the B- load prefix is stripped by the parse so the 25.10 release facts version-match).
+vendor: nokia-sros
+fingerprint:
+  priority: 100
+  match:
+    org_contains: ["Nokia"]
+    models_any: ["nokia-state"]
+platform_probe:
+  path: /state/system/version
+  encoding: json_ietf
+  parse:
+    # "TiMOS-B-25.10.R1 both/hops64 Nokia 7750 SR Copyright ..." -> os_version, model
+    - from: version-string
+      pattern: '^TiMOS-[A-Z]-(?P<os_version>\S+)\s+\S+\s+Nokia\s+(?P<model>.+?)\s+Copyright'

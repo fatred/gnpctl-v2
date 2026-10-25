@@ -1,0 +1,162 @@
+# Nokia SR OS normalization chains (egress, gnmic 0.46).
+#
+# SR OS native /state leaf names differ from SR Linux / OpenConfig, so the rename and
+# FSM (value-map) stages are SR-OS-specific. The convert / keep / fsm-convert stages match
+# the CANONICAL metric names, so those are reused from the shared chains (cpu/memory/
+# transceiver/bgp/isis/sensors .yaml). Leaf names + enums are from nokia 7x50 YANG @ 25.10;
+# the BGP session-state strings (free-text YANG `string`) and live values are finalized
+# against the defra1-az00-ed01 capture (M5).
+
+# --- CPU: /state/system/cpu/summary/usage/cpu-usage (decimal64, percent) ---
+sros-cpu-rename:
+  event-strings:
+    value-names:
+      - ".*/cpu-usage$"
+    transforms:
+      - replace:
+          apply-on: name
+          old: ".*/cpu-usage$"
+          new: cpu_utilization
+
+# --- Memory: /state/system/memory-pools/summary/{current-total-size,total-in-use,
+#     available-memory} (uint64 bytes) ---
+sros-memory-rename:
+  event-strings:
+    value-names:
+      - ".*/current-total-size$"
+      - ".*/total-in-use$"
+      - ".*/available-memory$"
+    transforms:
+      - replace:
+          apply-on: name
+          old: ".*/current-total-size$"
+          new: memory_total_bytes
+      - replace:
+          apply-on: name
+          old: ".*/total-in-use$"
+          new: memory_used_bytes
+      - replace:
+          apply-on: name
+          old: ".*/available-memory$"
+          new: memory_free_bytes
+
+# --- Transceivers: /state/port/.../digital-diagnostic-monitoring/
+#     {received-optical-power,transmit-output-power,transmit-bias-current}/current (decimal64).
+# NB: SR OS reports laser bias in MICROAMPERES; the canonical metric name is _ma. The
+# sros-xcvr-bias-scale stage divides by 1000 (uA -> mA) so the value matches the cross-vendor
+# unit (SR Linux / OpenConfig report mA). Chain order: rename -> convert(float) -> scale ->
+# keep, so the scale runs on the numeric value.
+sros-transceiver-rename:
+  event-strings:
+    value-names:
+      - ".*/received-optical-power/current$"
+      - ".*/transmit-output-power/current$"
+      - ".*/transmit-bias-current/current$"
+    transforms:
+      - replace:
+          apply-on: name
+          old: ".*/received-optical-power/current$"
+          new: transceiver_input_power_dbm
+      - replace:
+          apply-on: name
+          old: ".*/transmit-output-power/current$"
+          new: transceiver_output_power_dbm
+      - replace:
+          apply-on: name
+          old: ".*/transmit-bias-current/current$"
+          new: transceiver_laser_bias_ma
+
+# Scale SR OS laser bias from microamperes to milliamperes (cross-vendor unit). Runs after
+# transceiver-convert (value is numeric); guarded so other events pass through unchanged.
+sros-xcvr-bias-scale:
+  event-jq:
+    expression: 'map(if (.values // {}) | has("transceiver_laser_bias_ma") then .values.transceiver_laser_bias_ma /= 1000 else . end)'
+
+# --- BGP: /state/service/vprn/bgp/neighbor/statistics/session-state (YANG string FSM).
+# SR OS terms: idle/connect/active/opensent/openconnect/established (note openconnect, not
+# openconfirm). Uppercase first so any casing maps. Reuses bgp-fsm-convert / bgp-rename /
+# bgp-keep-state (canonical-name stages). The declared metric map mirrors this 1..6.
+sros-bgp-fsm:
+  event-strings:
+    value-names:
+      - ".*session-state$"
+    transforms:
+      - to-upper:
+          apply-on: value
+      - replace:
+          apply-on: value
+          old: "^IDLE$"
+          new: "1"
+      - replace:
+          apply-on: value
+          old: "^CONNECT$"
+          new: "2"
+      - replace:
+          apply-on: value
+          old: "^ACTIVE$"
+          new: "3"
+      - replace:
+          apply-on: value
+          old: "^OPENSENT$"
+          new: "4"
+      - replace:
+          apply-on: value
+          old: "^OPENCONNECT$"
+          new: "5"
+      - replace:
+          apply-on: value
+          old: "^ESTABLISHED$"
+          new: "6"
+
+# --- IS-IS: /state/service/vprn/isis/interface/adjacency/oper-state (enum
+#     initializing/up/failed/down via types-sros:oper-state). SR OS uses `/oper-state`
+#     (not `/adjacency-state`) and `initializing` (not `init`), so it needs its own stages;
+#     reuses isis-keep-state. ---
+sros-isis-fsm:
+  event-strings:
+    value-names:
+      - ".*adjacency/oper-state$"
+    transforms:
+      - to-upper:
+          apply-on: value
+      - replace:
+          apply-on: value
+          old: "^FAILED$"
+          new: "0"
+      - replace:
+          apply-on: value
+          old: "^DOWN$"
+          new: "1"
+      - replace:
+          apply-on: value
+          old: "^INITIALIZING$"
+          new: "2"
+      - replace:
+          apply-on: value
+          old: "^UP$"
+          new: "3"
+
+sros-isis-convert:
+  event-convert:
+    value-names:
+      - ".*adjacency/oper-state$"
+    type: int
+
+sros-isis-rename:
+  event-strings:
+    value-names:
+      - ".*adjacency/oper-state$"
+    transforms:
+      - replace:
+          apply-on: name
+          old: ".*adjacency/oper-state$"
+          new: isis_adjacency_state
+
+# --- Sensors / PSU: chassis power-supply oper-state (types-chassis:hw-oper-state, 18
+#     values). event-jq buckets to power_supply_state {1 working / 0 not-working /
+#     -1 not-present|transitional|unknown}; the raw value stays as the oper_state label.
+#     Reconciliation is skipped for event-jq, so the metric `map` carries the full 18-value
+#     classification (coverage). Reuses sensors-keep.
+sros-sensors-state:
+  event-jq:
+    expression: 'map((.values // {}) as $v | ($v|keys|map(select(endswith("oper-state")))) as $k | if ($k|length) > 0 then ($v[$k[0]]) as $raw | ($raw|ascii_downcase) as $s | .tags.oper_state = $raw | .values = {"power_supply_state": (if ["in-service","in-service-upgrade","in-service-downgrade","power-save"]|index($s) then 1 elif ["out-of-service","failed","diagnosing","reset-pending","soft-reset"]|index($s) then 0 else -1 end)} else . end)'

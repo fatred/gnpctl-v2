@@ -1,0 +1,9 @@
+{
+  "supported_models": [
+    {"name": "junos-qfx-system", "organization": "Juniper Networks, Inc.", "version": "2023-01-01"},
+    {"name": "openconfig-interfaces", "organization": "OpenConfig", "version": "2.0.0"},
+    {"name": "openconfig-platform", "organization": "OpenConfig", "version": "0.12.2"}
+  ],
+  "supported_encodings": ["json_ietf", "proto"],
+  "gnmi_version": "0.10.0"
+}

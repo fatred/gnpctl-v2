@@ -1,0 +1,6 @@
+{
+  "arista_eos": "edca2d12181b81b4522264fd99544c7c5b56888adb82a136d8618b289ba4cb25",
+  "juniper": "7abad6dc2eb941ae8058dd6d5daac1f90002eda2a9918c8462a93bf8a8b7b142",
+  "nokia_srl": "6dcbc0da42d1ff9c1042d40e462e9db6ebb7948baeaab83281f50053576da7cf",
+  "nokia_sros": "8739be65c06cd8790f6f87cdac5999494bed0fce137250b4d01bc336ce2ec7cf"
+}

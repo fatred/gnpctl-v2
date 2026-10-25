@@ -1,0 +1,24 @@
+leaf1:
+  address: 172.20.20.3:57400
+  encoding: proto
+  subscriptions:
+  - nokia-srlinux-environment
+  - nokia-srlinux-mempools
+  - nokia-srlinux-ports
+  - nokia-srlinux-processors
+  - nokia-srlinux-sensors
+  - nokia-srlinux-services
+  - nokia-srlinux-storage
+  - nokia-srlinux-transceivers
+  tags:
+    vendor: nokia
+    model: 7220 IXR-D2L
+    variant: nokia-srlinux
+spine1:
+  address: 172.20.20.4:6030
+  encoding: json_ietf
+  subscriptions:
+  - arista-eos-ports
+  tags:
+    vendor: arista
+    variant: arista-eos
