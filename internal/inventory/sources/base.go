@@ -4,8 +4,13 @@ package sources
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 )
+
+// credentialRefPattern is an environment variable identifier. Enforcing it
+// keeps a pasted secret out of credential_ref, which is stored and printed.
+var credentialRefPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 // Target is the normalized host yielded by every inventory source.
 type Target struct {
@@ -51,6 +56,13 @@ func ValidateBase(
 	if requiresCredential && credentialRef == "" {
 		return &SourceError{Msg: fmt.Sprintf(
 			"source type '%s' requires a credential reference (token env-var name)",
+			typeName,
+		)}
+	}
+	// Never echo the value: --token-env is easy to fill with the token itself.
+	if credentialRef != "" && !credentialRefPattern.MatchString(credentialRef) {
+		return &SourceError{Msg: fmt.Sprintf(
+			"source type '%s' credential reference must be an environment variable name ([A-Za-z_][A-Za-z0-9_]*)",
 			typeName,
 		)}
 	}

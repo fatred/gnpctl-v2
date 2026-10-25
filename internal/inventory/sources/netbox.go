@@ -59,6 +59,11 @@ func (s *NetBoxSource) token() (string, error) {
 	if s.CredentialRef == "" {
 		return "", &SourceError{Msg: "netbox source requires a token env-var name"}
 	}
+	// Only an identifier is a name; never echo a value that is not one (it may
+	// be a pasted token, e.g. from a hand-written row).
+	if !credentialRefPattern.MatchString(s.CredentialRef) {
+		return "", &SourceError{Msg: "netbox token env-var name must be an environment variable name ([A-Za-z_][A-Za-z0-9_]*)"}
+	}
 	token := os.Getenv(s.CredentialRef)
 	if token == "" {
 		return "", &SourceError{Msg: fmt.Sprintf("netbox token env var '%s' is not set", s.CredentialRef)}
