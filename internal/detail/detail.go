@@ -15,17 +15,16 @@ import (
 )
 
 // Identity is a platform probe's extracted identity. The three well-known
-// fields are nil when the probe could not extract them; any other extracted
-// field lands in Fields.
+// fields are nil when the probe could not extract them; extra extracted fields
+// are ignored.
 type Identity struct {
 	Vendor    string
 	OS        any
 	Model     any
 	OSVersion any
-	Fields    map[string]any
 }
 
-// Assign stores a well-known identity field, or an extra field in Fields.
+// Assign stores a well-known identity field.
 func (i *Identity) Assign(name string, value any) {
 	switch name {
 	case "model":
@@ -34,11 +33,6 @@ func (i *Identity) Assign(name string, value any) {
 		i.OS = value
 	case "os_version":
 		i.OSVersion = value
-	default:
-		if i.Fields == nil {
-			i.Fields = map[string]any{}
-		}
-		i.Fields[name] = value
 	}
 }
 
@@ -50,7 +44,7 @@ func (i *Identity) AsDict() map[string]any {
 // Resolve runs the vendor's platform probe and extracts identity, tolerating
 // absent fields. Transport and regex errors are returned to the caller.
 func Resolve(t transport.GnmiTransport, vendor *catalog.VendorDef) (*Identity, error) {
-	identity := &Identity{Vendor: vendor.Vendor, Fields: map[string]any{}}
+	identity := &Identity{Vendor: vendor.Vendor}
 	probe := vendor.PlatformProbe
 	if probe == nil {
 		return identity, nil
