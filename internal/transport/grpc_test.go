@@ -104,7 +104,7 @@ func first(values []string) string {
 
 // startStub serves gNMI over TLS with a self-signed cert, returning the target
 // address and the CA bundle path the transport must be pointed at.
-func startStub(t *testing.T, stub *stubServer) (host string, port int, caPath string) {
+func startStub(t *testing.T, stub gnmi.GNMIServer) (host string, port int, caPath string) {
 	t.Helper()
 
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -298,5 +298,53 @@ func TestUntrustedServerCertificateIsRejected(t *testing.T) {
 
 	if _, err := tr.Capabilities(); err == nil {
 		t.Fatal("Capabilities succeeded against a server whose certificate is not trusted")
+	}
+}
+
+// hungServer accepts every RPC and never answers; the transport must bound it
+// with a deadline instead of blocking forever.
+type hungServer struct {
+	gnmi.UnimplementedGNMIServer
+}
+
+func (s *hungServer) Capabilities(ctx context.Context, _ *gnmi.CapabilityRequest) (*gnmi.CapabilityResponse, error) {
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+func (s *hungServer) Subscribe(stream grpc.BidiStreamingServer[gnmi.SubscribeRequest, gnmi.SubscribeResponse]) error {
+	if _, err := stream.Recv(); err != nil {
+		return err
+	}
+	<-stream.Context().Done()
+	return stream.Context().Err()
+}
+
+func TestEveryRPCHasADeadline(t *testing.T) {
+	previous := rpcTimeout
+	rpcTimeout = 200 * time.Millisecond
+	t.Cleanup(func() { rpcTimeout = previous })
+
+	host, port, caPath := startStub(t, &hungServer{})
+	tr, err := NewLiveTransport(host, port, "", "", false, caPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { tr.Close() })
+
+	for name, call := range map[string]func() error{
+		"Capabilities": func() error { _, err := tr.Capabilities(); return err },
+		"SubscribeOnce": func() error {
+			_, err := tr.SubscribeOnce([]string{"/interfaces"}, "json_ietf")
+			return err
+		},
+	} {
+		start := time.Now()
+		if err := call(); err == nil {
+			t.Fatalf("%s succeeded against a server that never answers", name)
+		}
+		if elapsed := time.Since(start); elapsed > 5*time.Second {
+			t.Fatalf("%s took %v, want the %v deadline to fire", name, elapsed, rpcTimeout)
+		}
 	}
 }
