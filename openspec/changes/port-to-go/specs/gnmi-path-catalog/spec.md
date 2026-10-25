@@ -86,7 +86,7 @@ A variant's base (`catalog/<vendor>/<variant>/common.yaml`) SHALL declare a uniq
 combine **capability signals** (`models_any`, evaluated against the device's advertised models — for
 OS-level variants such as SR Linux vs SR OS) with **probe-identity** globs (`model`, `os` — for
 hardware-level variants such as Juniper MX vs QFX); an omitted condition, or `["*"]`, matches any. It
-MAY declare `default_port` — when present it MUST be a positive port number; a non-positive value is
+MAY declare `default_port` — when present it MUST be greater than zero; a non-positive value is
 rejected at load — `platform_hints`, and a preferred `encoding` (the renderer's default for
 this platform, since not every platform supports every encoding — e.g. Arista EOS advertises no
 PROTO). The `modules` map SHALL key each
