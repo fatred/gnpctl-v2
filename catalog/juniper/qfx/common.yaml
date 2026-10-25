@@ -1,6 +1,6 @@
 # Juniper QFX5k variant (Broadcom silicon) — /system-style telemetry.
 #
-# Selection is by probe model: QFX5* (four-corner validated on prod defra1 @ 23.4R2:
+# Selection is by probe model: QFX5* (four-corner validated on prod site A @ 23.4R2:
 # QFX5120-48Y-8C).
 #
 # Subscription paths are verbatim from the production gnmic ingestor

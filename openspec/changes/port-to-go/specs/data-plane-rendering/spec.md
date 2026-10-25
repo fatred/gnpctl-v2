@@ -135,8 +135,8 @@ so the emitted `source` tag is the device FQDN without a port, while the connect
 
 #### Scenario: Target named by FQDN, address keeps the IP
 
-- **WHEN** a device `CHZUR1-AZ01-LF01` at `172.19.224.34` is rendered with `target_device_domain: net.plabs.ch`
-- **THEN** the target is named `CHZUR1-AZ01-LF01.net.plabs.ch` (the `source` value) and its `address` is the IP (`172.19.224.34`)
+- **WHEN** a device `SRL-LEAF-01` at `192.0.2.34` is rendered with `target_device_domain: example.net`
+- **THEN** the target is named `SRL-LEAF-01.example.net` (the `source` value) and its `address` is the IP (`192.0.2.34`)
 
 #### Scenario: instance prepended to every egress chain
 

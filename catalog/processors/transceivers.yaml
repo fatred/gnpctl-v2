@@ -13,12 +13,12 @@
 #   temperature/latest-value      srl_nokia-comm:temperature, degrees Celsius
 # nokia subscribes both transceiver-level and per-channel (channel index -> tag);
 # juniper (OpenConfig) uses .../physical-channels/channel/state/<leaf>/instant, so
-# the rename matches latest-value OR instant. Validated on prod Juniper too (defra1,
+# the rename matches latest-value OR instant. Validated on prod Juniper too (site A,
 # QFX5k/QFX10k @ 23.4R2). SRL emits decimal64 as JSON strings, so transceiver-convert (-> float) is
 # required. Temperature is transceiver-level only (juniper exposes it at the
 # component, not in this channel-state path).
 #
-# Validated on PRODUCTION SRL (chzur1-az01-lf01, gnmic 0.46, real optics):
+# Validated on PRODUCTION SRL (srl-leaf-01, gnmic 0.46, real optics):
 # transceiver_input_power_dbm / output_power_dbm / laser_bias_ma / temperature_celsius,
 # numeric, with interface_name + channel_index (per-channel) tags.
 

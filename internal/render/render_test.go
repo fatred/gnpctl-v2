@@ -210,7 +210,7 @@ func fullRenderConfig(t *testing.T) *config.RenderConfig {
 
 func identityRenderConfig(t *testing.T) *config.RenderConfig {
 	return renderConfig(t, `  output_dir: ./out
-  target_device_domain: net.plabs.ch
+  target_device_domain: example.net
   nats:
     address: nats:4222
   prometheus:
@@ -442,7 +442,7 @@ func TestEgressTuningDefaultsToProductionReference(t *testing.T) {
 
 func TestTargetNamedByFQDNAndAddressKeepsIP(t *testing.T) {
 	desired := compute(t, miniState(t), miniCatalog(t), identityRenderConfig(t))
-	target, ok := targetsByName(desired.Targets.Targets)["leaf1.net.plabs.ch"]
+	target, ok := targetsByName(desired.Targets.Targets)["leaf1.example.net"]
 	if !ok {
 		t.Fatalf("targets = %v", desired.Targets.Targets)
 	}

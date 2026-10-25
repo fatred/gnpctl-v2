@@ -11,7 +11,7 @@
 #
 # Vendors emit only the subset they expose, under the shared names; derive the rest
 # in PromQL (e.g. used = total - free where a vendor lacks a `used` leaf). Validated on
-# prod Juniper too (defra1, QFX5k/QFX10k @ 23.4R2; OC `available` = total).
+# prod Juniper too (site A, QFX5k/QFX10k @ 23.4R2; OC `available` = total).
 #
 # Validated on live SRL (clab, gnmic 0.46): memory_total_bytes / memory_free_bytes /
 # memory_reserved_bytes / memory_utilization, control_slot tag. SRL emits these as

@@ -8,7 +8,7 @@
 # deployment-specific WAN_EDGE. CPU/memory/transceivers/BGP/ISIS use native /state; counters
 # pass through. The egress chains are SR-OS-specific renames + reused canonical-name
 # convert/keep stages (catalog/processors/sros.yaml). Authored against nokia 7x50 YANG @
-# 25.10 + the prod ingestor; FOUR-CORNER VALIDATED on prod defra1-az00-ed01 @ 25.10.R1
+# 25.10 + the prod ingestor; FOUR-CORNER VALIDATED on prod sros-edge-01 @ 25.10.R1
 # (7750 SR, `make validate` clean): cpu/memory/transceivers/PSU/BGP session-state/ISIS
 # adjacency all present, numeric, in range, labelled. (Laser-bias is uA on SR OS, scaled to
 # mA by sros-xcvr-bias-scale — see catalog/processors/sros.yaml.)

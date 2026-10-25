@@ -5,7 +5,7 @@
 # the CANONICAL metric names, so those are reused from the shared chains (cpu/memory/
 # transceiver/bgp/isis/sensors .yaml). Leaf names + enums are from nokia 7x50 YANG @ 25.10;
 # the BGP session-state strings (free-text YANG `string`) and live values are finalized
-# against the defra1-az00-ed01 capture (M5).
+# against the sros-edge-01 capture (M5).
 
 # --- CPU: /state/system/cpu/summary/usage/cpu-usage (decimal64, percent) ---
 sros-cpu-rename:

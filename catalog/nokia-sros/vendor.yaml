@@ -5,7 +5,7 @@
 # srl_nokia-*. Stage-2 probe (Subscribe-ONCE) reads /state/system/version — the
 # version-string carries both the running TiMOS release and the product model, e.g.
 #   "TiMOS-B-25.10.R1 both/hops64 Nokia 7750 SR Copyright (c) 2000-2025 Nokia."
-# Validated against live SR OS (defra1-az00-ed01): os_version 25.10.R1, model "7750 SR"
+# Validated against live SR OS (sros-edge-01): os_version 25.10.R1, model "7750 SR"
 # (the B- load prefix is stripped by the parse so the 25.10 release facts version-match).
 vendor: nokia-sros
 fingerprint:

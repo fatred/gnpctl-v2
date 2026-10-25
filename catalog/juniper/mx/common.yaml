@@ -1,6 +1,6 @@
 # Juniper MX + QFX10k variant (Express silicon) — chassis /components telemetry.
 #
-# Selection is by probe model: QFX10* (four-corner validated on prod defra1 @ 23.4R2:
+# Selection is by probe model: QFX10* (four-corner validated on prod site A @ 23.4R2:
 # QFX10002-72Q). MX* is included for MX chassis but is OUT OF SCOPE / unvalidated — no MX
 # in prod, and on MX the marketing model is
 # on the CHASSIS component, not the routing engine, so the probe's RE-derived

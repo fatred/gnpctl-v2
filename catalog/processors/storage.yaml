@@ -13,7 +13,7 @@
 #
 # Vendors emit only the subset they expose, under the shared names. SRL emits the
 # byte/percentage leaves as JSON strings, so storage-convert (-> float) is required.
-# Validated on prod Juniper too (defra1 QFX5k @ 23.4R2; juniper-qfx leaf role).
+# Validated on prod Juniper too (site A QFX5k @ 23.4R2; juniper-qfx leaf role).
 #
 # Validated on live SRL (clab, gnmic 0.46): per partition storage_total_bytes/
 # storage_used_bytes/storage_free_bytes/storage_utilization, with disk_name +

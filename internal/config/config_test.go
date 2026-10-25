@@ -236,7 +236,7 @@ func TestRenderMinimalTakesDefaults(t *testing.T) {
 const renderFull = valid + `
 render:
   output_dir: ./render
-  target_device_domain: net.plabs.ch
+  target_device_domain: example.net
   nats:
     address: nats:4222
     output:
@@ -267,7 +267,7 @@ render:
 
 func TestRenderDeploymentKnobsParsedAndOverridable(t *testing.T) {
 	r := mustLoad(t, renderFull).Render
-	if r.TargetDeviceDomain == nil || *r.TargetDeviceDomain != "net.plabs.ch" {
+	if r.TargetDeviceDomain == nil || *r.TargetDeviceDomain != "example.net" {
 		t.Fatalf("target_device_domain = %v", r.TargetDeviceDomain)
 	}
 	g := r.Gnmic

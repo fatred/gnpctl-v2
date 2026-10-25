@@ -3,7 +3,7 @@
 #   fan_speed_percent     gauge (percent)
 #
 # Four-corner-validated on prod (make validate clean): temperature_celsius on juniper-mx
-# (defra1-az00-cr03, QFX10k), nokia-srlinux (chzur1-az01-lf01), nokia-sros (defra1-az00-ed01);
+# (qfx-core-01, QFX10k), nokia-srlinux (srl-leaf-01), nokia-sros (sros-edge-01);
 # fan_speed_percent on nokia-srlinux + nokia-sros. juniper-qfx (QFX5k leaf) has no OC
 # /components temperature, so no environment module.
 #
