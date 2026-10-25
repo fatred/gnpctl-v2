@@ -2,7 +2,8 @@ package catalog
 
 import (
 	"fmt"
-	"sort"
+	"maps"
+	"slices"
 )
 
 // YangSelection is the registry release chosen for a device, with an optional advisory.
@@ -20,24 +21,11 @@ func newYangRegistry(facts map[string]map[string]map[string]*YangFact) *YangRegi
 	return &YangRegistry{facts: facts}
 }
 
-func (y *YangRegistry) Vendors() []string {
-	out := make([]string, 0, len(y.facts))
-	for vendor := range y.facts {
-		out = append(out, vendor)
-	}
-	sort.Strings(out) // Python iterates the sorted vendor directories
-	return out
-}
-
 func (y *YangRegistry) Releases(vendor string) []string {
-	rels := make([]string, 0, len(y.facts[vendor]))
-	for release := range y.facts[vendor] {
-		rels = append(rels, release)
-	}
 	// Python sorts the filename-ordered dict keys stably by version key, so ties
 	// (4.32.0F vs 4.32.0M) resolve by name, not map iteration order.
-	sort.Strings(rels)
-	sortByVersion(rels)
+	rels := slices.Sorted(maps.Keys(y.facts[vendor]))
+	slices.SortStableFunc(rels, func(a, b string) int { return slices.Compare(versionKey(a), versionKey(b)) })
 	return rels
 }
 
@@ -57,7 +45,7 @@ func (y *YangRegistry) SelectRelease(vendor string, osVersion *string) YangSelec
 	dev := versionKey(*osVersion)
 	chosen := -1
 	for i, rel := range rels {
-		if compareVersionKeys(versionKey(rel), dev) <= 0 {
+		if slices.Compare(versionKey(rel), dev) <= 0 {
 			chosen = i
 		}
 	}
@@ -66,7 +54,7 @@ func (y *YangRegistry) SelectRelease(vendor string, osVersion *string) YangSelec
 		var warning *string
 		// Warn only when the device is beyond the newest pinned *line* — a patch
 		// within it (release key is a prefix of the device key) is covered.
-		if compareVersionKeys(dev, newest) > 0 && !hasKeyPrefix(dev, newest) {
+		if slices.Compare(dev, newest) > 0 && !(len(dev) >= len(newest) && slices.Equal(dev[:len(newest)], newest)) {
 			w := fmt.Sprintf(
 				"device os_version '%s' is newer than the newest pinned %s YANG release '%s'; validating against it",
 				*osVersion, vendor, rels[len(rels)-1])
@@ -102,19 +90,6 @@ func (y *YangRegistry) Fact(vendor, release, fid string) *YangFact {
 	return y.facts[vendor][release][fid]
 }
 
-func (y *YangRegistry) Resolve(vendor string, osVersion *string, fid string) (*YangFact, error) {
-	sel := y.SelectRelease(vendor, osVersion)
-	if sel.Release == nil {
-		return nil, catalogErr("no YANG facts for vendor '%s'", vendor)
-	}
-	found := y.Fact(vendor, *sel.Release, fid)
-	if found == nil {
-		return nil, catalogErr("unknown YANG fact id '%s' for vendor '%s' release '%s'",
-			fid, vendor, *sel.Release)
-	}
-	return found, nil
-}
-
 // versionKey is the integer-run tuple Python's _version_key produces.
 func versionKey(value string) []int {
 	var out []int
@@ -135,43 +110,4 @@ func versionKey(value string) []int {
 		out = append(out, n)
 	}
 	return out
-}
-
-func compareVersionKeys(a, b []int) int {
-	for i := 0; i < len(a) && i < len(b); i++ {
-		if a[i] != b[i] {
-			if a[i] < b[i] {
-				return -1
-			}
-			return 1
-		}
-	}
-	switch {
-	case len(a) < len(b):
-		return -1
-	case len(a) > len(b):
-		return 1
-	}
-	return 0
-}
-
-func hasKeyPrefix(key, prefix []int) bool {
-	if len(key) < len(prefix) {
-		return false
-	}
-	for i := range prefix {
-		if key[i] != prefix[i] {
-			return false
-		}
-	}
-	return true
-}
-
-func sortByVersion(items []string) {
-	// Stable, like Python's sorted(key=_version_key) over insertion-ordered keys.
-	for i := 1; i < len(items); i++ {
-		for j := i; j > 0 && compareVersionKeys(versionKey(items[j]), versionKey(items[j-1])) < 0; j-- {
-			items[j], items[j-1] = items[j-1], items[j]
-		}
-	}
 }

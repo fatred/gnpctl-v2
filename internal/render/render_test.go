@@ -13,6 +13,7 @@ import (
 	"github.com/fatred/gnpctl-v2/internal/catalog"
 	"github.com/fatred/gnpctl-v2/internal/config"
 	"github.com/fatred/gnpctl-v2/internal/emit"
+	"github.com/fatred/gnpctl-v2/internal/golden"
 	"github.com/fatred/gnpctl-v2/internal/render"
 	"github.com/fatred/gnpctl-v2/internal/state"
 	"gopkg.in/yaml.v3"
@@ -450,7 +451,7 @@ func TestTargetNamedByFQDNAndAddressKeepsIP(t *testing.T) {
 		target.Port == nil || *target.Port != 57400 {
 		t.Fatalf("address = %v port = %v", target.Address, target.Port)
 	}
-	if _, err := emit.NewFileEmitter(t.TempDir()).Emit(desired); err != nil {
+	if _, err := emit.Emit(t.TempDir(), desired); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -500,7 +501,7 @@ func TestSkipVerifyRenderWarnsAndBanners(t *testing.T) {
 	desired := compute(t, miniState(t), miniCatalog(t), skipVerifyRenderConfig(t))
 	dir := t.TempDir()
 	stderr := captureStderr(t, func() {
-		if _, err := emit.NewFileEmitter(dir).Emit(desired); err != nil {
+		if _, err := emit.Emit(dir, desired); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -521,7 +522,7 @@ func TestSecureRenderEmitsNoTLSWarning(t *testing.T) {
 	desired := compute(t, miniState(t), miniCatalog(t), defaultRenderConfig(t))
 	dir := t.TempDir()
 	stderr := captureStderr(t, func() {
-		if _, err := emit.NewFileEmitter(dir).Emit(desired); err != nil {
+		if _, err := emit.Emit(dir, desired); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -578,7 +579,7 @@ func TestPortsSliceGoldenRenderRealCatalog(t *testing.T) {
 		t.Fatal("gnpctl-meta spec missing")
 	}
 	dir := t.TempDir()
-	if _, err := emit.NewFileEmitter(dir).Emit(desired); err != nil {
+	if _, err := emit.Emit(dir, desired); err != nil {
 		t.Fatal(err)
 	}
 	ingress := readYAML(t, filepath.Join(dir, "ingress.yaml"))
@@ -835,15 +836,7 @@ func federateState(t *testing.T) *state.State {
 func TestGoldenRenderSemantic(t *testing.T) {
 	cat := realCatalog(t)
 	goldenDir := filepath.Join("..", "..", "testdata", "golden")
-	dbSource := filepath.Join(goldenDir, "python_state.db")
-	dbCopy := filepath.Join(t.TempDir(), "state.db")
-	data, err := os.ReadFile(dbSource)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(dbCopy, data, 0o644); err != nil {
-		t.Fatal(err)
-	}
+	dbCopy := golden.CopyDB(t)
 	cfgPath := filepath.Join(t.TempDir(), "gnpctl.yaml")
 	cfgText := "database: " + dbCopy + "\n" +
 		"catalog: " + filepath.Join("..", "..", "catalog") + "\n" +
@@ -864,7 +857,7 @@ func TestGoldenRenderSemantic(t *testing.T) {
 
 	desired := compute(t, st, cat, cfg.Render)
 	outDir := t.TempDir()
-	if _, err := emit.NewFileEmitter(outDir).Emit(desired); err != nil {
+	if _, err := emit.Emit(outDir, desired); err != nil {
 		t.Fatal(err)
 	}
 	for _, name := range []string{"ingress.yaml", "targets.yaml", "egress.yaml"} {

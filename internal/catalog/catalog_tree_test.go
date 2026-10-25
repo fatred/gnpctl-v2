@@ -408,7 +408,7 @@ func TestProcessorLibraryLoadedAndReferenced(t *testing.T) {
 		"nokia/srlinux/common.yaml": withProcs,
 	}))
 	if !cat.Processors().Contains("add-device-labels") {
-		t.Fatalf("processor names = %v", cat.Processors().Names())
+		t.Fatal("processor add-device-labels missing")
 	}
 	eff, err := cat.EffectiveProfile("nokia-srlinux", nil)
 	if err != nil {

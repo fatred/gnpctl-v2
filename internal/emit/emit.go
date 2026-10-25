@@ -6,11 +6,9 @@ package emit
 import (
 	"bytes"
 	"fmt"
-	"math"
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 
 	"github.com/fatred/gnpctl-v2/internal/render"
 	"gopkg.in/yaml.v3"
@@ -27,18 +25,10 @@ const SkipVerifyBanner = "# ====================================================
 	"# Prefer `render.gnmic.tls_ca: <ca-bundle>` to pin a private CA instead.\n" +
 	"# ============================================================================\n"
 
-// FileEmitter serializes a DesiredConfig to ingress.yaml / egress.yaml /
-// targets.yaml under OutputDir.
-type FileEmitter struct {
-	OutputDir string
-}
-
-// NewFileEmitter returns a FileEmitter writing to dir.
-func NewFileEmitter(dir string) *FileEmitter { return &FileEmitter{OutputDir: dir} }
-
-// Emit writes the three artifacts in Python's order and returns their paths.
-func (e *FileEmitter) Emit(desired *render.DesiredConfig) ([]string, error) {
-	if err := os.MkdirAll(e.OutputDir, 0o777); err != nil {
+// Emit serializes a DesiredConfig to ingress.yaml / egress.yaml / targets.yaml
+// under dir, in Python's order, and returns their paths.
+func Emit(dir string, desired *render.DesiredConfig) ([]string, error) {
+	if err := os.MkdirAll(dir, 0o777); err != nil {
 		return nil, err
 	}
 	artifacts := []struct {
@@ -51,7 +41,7 @@ func (e *FileEmitter) Emit(desired *render.DesiredConfig) ([]string, error) {
 	}
 	written := make([]string, 0, len(artifacts))
 	for _, artifact := range artifacts {
-		path := filepath.Join(e.OutputDir, artifact.name)
+		path := filepath.Join(dir, artifact.name)
 		text, err := dump(artifact.doc)
 		if err != nil {
 			return nil, err
@@ -143,15 +133,8 @@ func targetsDoc(desired *render.DesiredConfig) render.Ordered {
 			entry.Set("encoding", *t.Encoding)
 		}
 		entry.Set("subscriptions", t.Subscriptions)
-		tags := render.Ordered{}
-		for i, key := range t.Tags.Keys {
-			if t.Tags.Values[i] == nil {
-				continue
-			}
-			tags.Set(key, t.Tags.Values[i])
-		}
-		if len(tags.Keys) > 0 {
-			entry.Set("tags", tags)
+		if len(t.Tags.Keys) > 0 {
+			entry.Set("tags", t.Tags)
 		}
 		doc.Set(t.Name, entry)
 	}
@@ -236,11 +219,6 @@ func valueNode(value any) (*yaml.Node, error) {
 		return copyNode(v), nil
 	case render.Ordered:
 		return mappingNode(v)
-	case *render.Ordered:
-		if v == nil {
-			return nullNode(), nil
-		}
-		return mappingNode(*v)
 	case []any:
 		return sequenceNode(v)
 	case []string:
@@ -255,10 +233,6 @@ func valueNode(value any) (*yaml.Node, error) {
 		return scalarNode("!!bool", strconv.FormatBool(v)), nil
 	case int:
 		return scalarNode("!!int", strconv.Itoa(v)), nil
-	case int64:
-		return scalarNode("!!int", strconv.FormatInt(v, 10)), nil
-	case float64:
-		return scalarNode("!!float", floatText(v)), nil
 	case string:
 		return scalarNode("!!str", v), nil
 	default:
@@ -284,33 +258,10 @@ func scalarNode(tag, value string) *yaml.Node {
 
 func nullNode() *yaml.Node { return scalarNode("!!null", "null") }
 
-// floatText formats a float so YAML readers resolve it as a float: PyYAML-style
-// .inf/.nan and a trailing .0 when the shortest form would look like an int.
-func floatText(f float64) string {
-	switch {
-	case math.IsInf(f, 1):
-		return ".inf"
-	case math.IsInf(f, -1):
-		return "-.inf"
-	case math.IsNaN(f):
-		return ".nan"
-	}
-	text := strconv.FormatFloat(f, 'g', -1, 64)
-	if !strings.ContainsAny(text, ".eE") {
-		text += ".0"
-	}
-	return text
-}
-
 // copyNode deep-copies a catalog YAML node as a plain block node, resolving
 // aliases so the emitted document never references an anchor outside itself.
 func copyNode(node *yaml.Node) *yaml.Node {
 	switch node.Kind {
-	case yaml.DocumentNode:
-		if len(node.Content) > 0 {
-			return copyNode(node.Content[0])
-		}
-		return nullNode()
 	case yaml.AliasNode:
 		return copyNode(node.Alias)
 	case yaml.MappingNode:

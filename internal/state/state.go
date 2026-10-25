@@ -6,7 +6,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"sort"
+	"maps"
+	"slices"
 	"strings"
 	"time"
 
@@ -306,31 +307,22 @@ func (s *State) ModuleValue(target, name string) (*int, error) {
 	return &n, nil
 }
 
-// EnabledModules returns the names whose effective enum is enabled (>= 1) for
-// the target.
-func (s *State) EnabledModules(target string, names []string) ([]string, error) {
+// Enabled returns the names whose mod_ column in a target row is enabled (>= 1).
+func Enabled(row map[string]any, names []string) []string {
 	var enabled []string
 	for _, name := range names {
-		v, err := s.ModuleValue(target, name)
-		if err != nil {
-			return nil, err
-		}
-		if v != nil && *v >= 1 {
+		if v, _ := row[ModuleColumn(name)].(int64); v >= 1 {
 			enabled = append(enabled, name)
 		}
 	}
-	return enabled, nil
+	return enabled
 }
 
 // ReconcileModules sets discovery-owned columns (current 0/1) to the profile
 // default; operator pins (-1 force-off / 2 force-on) are preserved. All updates
 // commit together, as Python's single commit does.
 func (s *State) ReconcileModules(target string, defaults map[string]int) error {
-	names := make([]string, 0, len(defaults))
-	for name := range defaults {
-		names = append(names, name)
-	}
-	sort.Strings(names)
+	names := slices.Sorted(maps.Keys(defaults))
 	tx, err := s.db.Begin()
 	if err != nil {
 		return err

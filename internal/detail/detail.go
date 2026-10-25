@@ -5,8 +5,9 @@ package detail
 import (
 	"fmt"
 	"log/slog"
+	"maps"
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/fatred/gnpctl-v2/internal/catalog"
@@ -14,17 +15,16 @@ import (
 )
 
 // Identity is a platform probe's extracted identity. The three well-known
-// fields are nil when the probe could not extract them; any other extracted
-// field lands in Fields.
+// fields are nil when the probe could not extract them; extra extracted fields
+// are ignored.
 type Identity struct {
 	Vendor    string
 	OS        any
 	Model     any
 	OSVersion any
-	Fields    map[string]any
 }
 
-// Assign stores a well-known identity field, or an extra field in Fields.
+// Assign stores a well-known identity field.
 func (i *Identity) Assign(name string, value any) {
 	switch name {
 	case "model":
@@ -33,11 +33,6 @@ func (i *Identity) Assign(name string, value any) {
 		i.OS = value
 	case "os_version":
 		i.OSVersion = value
-	default:
-		if i.Fields == nil {
-			i.Fields = map[string]any{}
-		}
-		i.Fields[name] = value
 	}
 }
 
@@ -49,7 +44,7 @@ func (i *Identity) AsDict() map[string]any {
 // Resolve runs the vendor's platform probe and extracts identity, tolerating
 // absent fields. Transport and regex errors are returned to the caller.
 func Resolve(t transport.GnmiTransport, vendor *catalog.VendorDef) (*Identity, error) {
-	identity := &Identity{Vendor: vendor.Vendor, Fields: map[string]any{}}
+	identity := &Identity{Vendor: vendor.Vendor}
 	probe := vendor.PlatformProbe
 	if probe == nil {
 		return identity, nil
@@ -65,7 +60,7 @@ func Resolve(t transport.GnmiTransport, vendor *catalog.VendorDef) (*Identity, e
 	}
 	elements := group(updates)
 
-	for _, name := range sortedKeys(probe.Extract) {
+	for _, name := range slices.Sorted(maps.Keys(probe.Extract)) {
 		value := locate(elements, probe.Extract[name])
 		if value == nil {
 			slog.Warn(fmt.Sprintf("probe %s: could not extract '%s'", probe.Path, name))
@@ -147,7 +142,7 @@ func group(updates []transport.LeafUpdate) []*elementGroup {
 			elements = append(elements, element)
 		}
 		if blob, ok := update.Value.(map[string]any); ok {
-			for _, key := range sortedKeys(blob) {
+			for _, key := range slices.Sorted(maps.Keys(blob)) {
 				element.leaves[leafName(key)] = blob[key]
 			}
 		} else {
@@ -190,17 +185,6 @@ func locate(elements []*elementGroup, locator catalog.Locator) any {
 		return nil
 	}
 	return leaves[leafName(locator.Leaf)]
-}
-
-// sortedKeys orders map iteration so extraction warnings and duplicate
-// leaf-name collisions are deterministic; the last sorted key wins.
-func sortedKeys[V any](values map[string]V) []string {
-	keys := make([]string, 0, len(values))
-	for key := range values {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	return keys
 }
 
 // pyString mirrors Python's str() for the scalar values probes compare and

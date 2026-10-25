@@ -55,7 +55,7 @@ func RunTest(
 			return nil, false, err
 		}
 		for _, row := range rows {
-			if discovered := row["discovered"]; discovered == int64(1) || discovered == 1 {
+			if discovered := row["discovered"]; discovered == int64(1) {
 				targets = append(targets, row)
 			}
 		}
@@ -96,12 +96,8 @@ func testTarget(
 	if err != nil {
 		return TargetTestResult{}, false, err
 	}
-	enabledNames, err := st.EnabledModules(name, names)
-	if err != nil {
-		return TargetTestResult{}, false, err
-	}
-	enabled := make(map[string]bool, len(enabledNames))
-	for _, module := range enabledNames {
+	enabled := map[string]bool{}
+	for _, module := range state.Enabled(row, names) {
 		enabled[module] = true
 	}
 	var paths []string
@@ -173,11 +169,6 @@ func rowOSVersion(row map[string]any) *string {
 }
 
 func rowInt(row map[string]any, key string) int {
-	switch v := row[key].(type) {
-	case int64:
-		return int(v)
-	case int:
-		return v
-	}
-	return 0
+	v, _ := row[key].(int64)
+	return int(v)
 }

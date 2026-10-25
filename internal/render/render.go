@@ -3,6 +3,8 @@
 package render
 
 import (
+	"maps"
+	"slices"
 	"sort"
 
 	"github.com/fatred/gnpctl-v2/internal/catalog"
@@ -253,7 +255,7 @@ func collectSlices(
 	st *state.State, cat *catalog.LayeredCatalog, renderCfg *config.RenderConfig,
 ) (map[string]*slice, []TargetEntry, error) {
 	moduleNames := cat.Modules().Names()
-	slices := map[string]*slice{}
+	slots := map[string]*slice{}
 	var targets []TargetEntry
 
 	rows, err := st.AllTargets()
@@ -278,10 +280,7 @@ func collectSlices(
 			return nil, nil, err
 		}
 		name := stringValue(row["name"])
-		enabled, err := st.EnabledModules(name, moduleNames)
-		if err != nil {
-			return nil, nil, err
-		}
+		enabled := state.Enabled(row, moduleNames)
 		enabledSet := make(map[string]bool, len(enabled))
 		for _, m := range enabled {
 			enabledSet[m] = true
@@ -295,14 +294,14 @@ func collectSlices(
 			}
 			subName := key + "-" + moduleName
 			targetSubs = append(targetSubs, subName)
-			slot, ok := slices[subName]
+			slot, ok := slots[subName]
 			if !ok {
 				slot = &slice{
 					pathIndex:  map[string]bool{},
 					processors: append([]string{}, resolved.Processors...),
 					federate:   map[string]bool{},
 				}
-				slices[subName] = slot
+				slots[subName] = slot
 			}
 			for _, p := range resolved.Paths {
 				pk := p.PathKey()
@@ -346,24 +345,20 @@ func collectSlices(
 			Tags:          tags,
 		})
 	}
-	return slices, targets, nil
+	return slots, targets, nil
 }
 
 func buildPipeline(
-	slices map[string]*slice, renderCfg *config.RenderConfig,
+	slots map[string]*slice, renderCfg *config.RenderConfig,
 ) ([]Subscription, []JetstreamOutput, []EgressConsumer) {
 	tuning := renderCfg.Nats.Output
-	names := make([]string, 0, len(slices))
-	for name := range slices {
-		names = append(names, name)
-	}
-	sort.Strings(names)
+	names := slices.Sorted(maps.Keys(slots))
 
 	subscriptions := make([]Subscription, 0, len(names))
 	outputs := make([]JetstreamOutput, 0, len(names))
 	consumers := make([]EgressConsumer, 0, len(names))
 	for _, name := range names {
-		slot := slices[name]
+		slot := slots[name]
 		subscriptions = append(subscriptions, Subscription{
 			Name:                name,
 			StreamSubscriptions: groupPaths(slot.paths),
@@ -392,7 +387,7 @@ func buildPipeline(
 // attachSharedProcessors resolves referenced processor specs and splices in the
 // two shared chains, mutating each consumer's processors in place.
 func attachSharedProcessors(
-	consumers []EgressConsumer, slices map[string]*slice,
+	consumers []EgressConsumer, slots map[string]*slice,
 	cat *catalog.LayeredCatalog, renderCfg *config.RenderConfig,
 ) Ordered {
 	seen := map[string]bool{}
@@ -422,19 +417,15 @@ func attachSharedProcessors(
 
 	// Append the shared federate tag to every chain carrying a federated metric.
 	federatedSet := map[string]bool{}
-	for _, slot := range slices {
+	for _, slot := range slots {
 		for n := range slot.federate {
 			federatedSet[n] = true
 		}
 	}
-	federated := make([]string, 0, len(federatedSet))
-	for n := range federatedSet {
-		federated = append(federated, n)
-	}
-	sort.Strings(federated)
+	federated := slices.Sorted(maps.Keys(federatedSet))
 	if len(federated) > 0 {
 		for i := range consumers {
-			if len(slices[consumers[i].Name].federate) > 0 {
+			if len(slots[consumers[i].Name].federate) > 0 {
 				consumers[i].Processors = append(consumers[i].Processors, FederateProc)
 			}
 		}
@@ -447,12 +438,12 @@ func attachSharedProcessors(
 func Compute(
 	st *state.State, cat *catalog.LayeredCatalog, renderCfg *config.RenderConfig,
 ) (*DesiredConfig, error) {
-	slices, targets, err := collectSlices(st, cat, renderCfg)
+	slots, targets, err := collectSlices(st, cat, renderCfg)
 	if err != nil {
 		return nil, err
 	}
-	subscriptions, outputs, consumers := buildPipeline(slices, renderCfg)
-	specs := attachSharedProcessors(consumers, slices, cat, renderCfg)
+	subscriptions, outputs, consumers := buildPipeline(slots, renderCfg)
+	specs := attachSharedProcessors(consumers, slots, cat, renderCfg)
 
 	sort.SliceStable(targets, func(i, j int) bool { return targets[i].Name < targets[j].Name })
 
@@ -498,15 +489,8 @@ func Compute(
 }
 
 func discovered(row map[string]any) bool {
-	switch v := row["discovered"].(type) {
-	case int64:
-		return v != 0
-	case int:
-		return v != 0
-	case bool:
-		return v
-	}
-	return false
+	v, _ := row["discovered"].(int64)
+	return v != 0
 }
 
 // stringValue mirrors Python's row.get(key) or "", which also flattens NULL.
@@ -524,17 +508,10 @@ func optionalString(v any) *string {
 }
 
 func optionalInt(v any) *int {
-	if v == nil {
+	n, ok := v.(int64)
+	if !ok {
 		return nil
 	}
-	var n int
-	switch t := v.(type) {
-	case int64:
-		n = int(t)
-	case int:
-		n = t
-	default:
-		return nil
-	}
-	return &n
+	i := int(n)
+	return &i
 }
