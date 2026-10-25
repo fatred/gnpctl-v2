@@ -121,7 +121,8 @@ func testTarget(
 	}
 	gnmi, err := factory(row, port)
 	if err != nil {
-		return TargetTestResult{}, false, err
+		// One unreachable target must not hide the results of the others.
+		return TargetTestResult{Name: name, Ready: true, Results: []PathResult{{Path: "(connect)", Detail: err.Error()}}}, true, nil
 	}
 	defer func() {
 		if closer, ok := gnmi.(interface{ Close() error }); ok {

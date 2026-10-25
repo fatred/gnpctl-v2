@@ -334,4 +334,3 @@ func copyNode(node *yaml.Node) *yaml.Node {
 		return scalarNode(tag, node.Value)
 	}
 }
-

@@ -1,6 +1,7 @@
 package testcmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -348,5 +349,29 @@ func TestTransportClosedPerTarget(t *testing.T) {
 	}
 	if previous == nil || !previous.closed {
 		t.Fatal("last target's transport was not closed")
+	}
+}
+
+func TestFactoryErrorFailsOnlyThatTarget(t *testing.T) {
+	cat := testCatalog(t)
+	s := openTestState(t)
+	discovered(t, s, cat, "leaf1", "ports")
+	discovered(t, s, cat, "leaf2", "ports")
+	subs := fixture(map[string]map[string]any{"/interfaces": {"leaf": 1}})
+	factory := func(row map[string]any, _ int) (transport.GnmiTransport, error) {
+		if row["name"] == "leaf1" {
+			return nil, errors.New("target has no address")
+		}
+		return subs, nil
+	}
+	results, failed, err := RunTest(s, cat, nil, factory)
+	if err != nil || !failed || len(results) != 2 {
+		t.Fatalf("results=%d failed=%v err=%v", len(results), failed, err)
+	}
+	if r := results[0]; r.Name != "leaf1" || r.Results[0].OK || r.Results[0].Detail != "target has no address" {
+		t.Fatalf("leaf1 = %+v", r)
+	}
+	if !results[1].Results[0].OK {
+		t.Fatalf("leaf2 = %+v", results[1])
 	}
 }
