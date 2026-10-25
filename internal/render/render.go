@@ -255,6 +255,10 @@ func collectSlices(
 	st *state.State, cat *catalog.LayeredCatalog, renderCfg *config.RenderConfig,
 ) (map[string]*slice, []TargetEntry, error) {
 	moduleNames := cat.Modules().Names()
+	// Rows are read for mod_* values; a column added by a newer catalog must exist, not read as off.
+	if err := st.EnsureModuleColumns(moduleNames); err != nil {
+		return nil, nil, err
+	}
 	slots := map[string]*slice{}
 	var targets []TargetEntry
 
