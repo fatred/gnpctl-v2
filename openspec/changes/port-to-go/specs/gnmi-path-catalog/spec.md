@@ -86,7 +86,8 @@ A variant's base (`catalog/<vendor>/<variant>/common.yaml`) SHALL declare a uniq
 combine **capability signals** (`models_any`, evaluated against the device's advertised models — for
 OS-level variants such as SR Linux vs SR OS) with **probe-identity** globs (`model`, `os` — for
 hardware-level variants such as Juniper MX vs QFX); an omitted condition, or `["*"]`, matches any. It
-MAY declare `default_port`, `platform_hints`, and a preferred `encoding` (the renderer's default for
+MAY declare `default_port` — when present it MUST be greater than zero; a non-positive value is
+rejected at load — `platform_hints`, and a preferred `encoding` (the renderer's default for
 this platform, since not every platform supports every encoding — e.g. Arista EOS advertises no
 PROTO). The `modules` map SHALL key each
 canonical module name (from the registry) the variant supports to a block with a `paths` list (each
@@ -99,6 +100,11 @@ all of the variant's supported versions. Variants SHALL be resolvable by `key`.
 
 - **WHEN** `catalog/juniper/mx/common.yaml` declares `key: juniper-mx`, `platform_match.model: ["MX*", "QFX10*"]`, `default_port: 57400`, and a `modules` map
 - **THEN** the loaded variant exposes its platform match, default port, and per-module paths + defaults
+
+#### Scenario: Non-positive default_port rejected at load
+
+- **WHEN** a variant's `common.yaml` declares `default_port: 0` (or a negative value)
+- **THEN** catalog loading fails with a validation error naming the file, `default_port`, and "must be positive"
 
 #### Scenario: Single-platform variant matches any model
 
